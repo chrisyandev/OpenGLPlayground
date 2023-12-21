@@ -7,17 +7,17 @@
 #include"VBO.h"
 #include"EBO.h"
 
-GLfloat vertices[] = // coordinates of vertices
-{
-	-0.5f, -0.5f * float(sqrt(3)) / 3, 0.0f, // outer bottom left
-	0.5f, -0.5f * float(sqrt(3)) / 3, 0.0f, // outer bottom right
-	0.0f, 0.5f * float(sqrt(3)) * 2 / 3, 0.0f, // outer top middle
-	-0.5f / 2, 0.5f * float(sqrt(3)) / 6, 0.0f, // inner top left
-	0.5f / 2, 0.5f * float(sqrt(3)) / 6, 0.0f, // inner top right
-	0.0f, -0.5f * float(sqrt(3)) / 3, 0.0f // inner bottom middle
+GLfloat vertices[] =
+{	// COORDINATES										// COLORS
+	-0.5f,		-0.5f * float(sqrt(3)) / 3,		0.0f,	0.8f, 0.3f, 0.02f,	// outer bottom left
+	0.5f,		-0.5f * float(sqrt(3)) / 3,		0.0f,	0.8f, 0.3f, 0.02f,	// outer bottom right
+	0.0f,		0.5f * float(sqrt(3)) * 2 / 3,	0.0f,	1.0f, 0.6f, 0.32f,	// outer top middle
+	-0.5f / 2,	0.5f * float(sqrt(3)) / 6,		0.0f,	0.9f, 0.45f, 0.17f,	// inner top left
+	0.5f / 2,	0.5f * float(sqrt(3)) / 6,		0.0f,	0.9f, 0.45f, 0.17f,	// inner top right
+	0.0f,		-0.5f * float(sqrt(3)) / 3,		0.0f,	0.8f, 0.3f, 0.02f,	// inner bottom middle
 };
 
-GLuint indices[] =
+GLuint indices[] = // describes vertices order
 {
 	0, 3, 5, // lower left triangle
 	3, 2, 4, // lower right triangle
@@ -53,16 +53,20 @@ int main()
 	VBO VBO1(vertices, sizeof(vertices)); // generate VBO and link it to vertices
 	EBO EBO1(indices, sizeof(indices)); // generate EBO and link it to indices
 
-	VAO1.LinkVBO(VBO1, 0); // link VBO to VAO
+	VAO1.LinkAttrib(VBO1, 0, 3, GL_FLOAT, 6 * sizeof(float), (void*)0); // link VBO position attribute to VAO
+	VAO1.LinkAttrib(VBO1, 1, 3, GL_FLOAT, 6 * sizeof(float), (void*)(3 * sizeof(float))); // link VBO color attribute to VAO
 	VAO1.Unbind(); // unbind all to prevent accidental modification // make sure unbinding VAO comes first
 	VBO1.Unbind();
 	EBO1.Unbind();
+
+	GLuint uniID = glGetUniformLocation(shaderProgram.ID, "scale"); // gets ID of uniform called "scale"
 
 	while (!glfwWindowShouldClose(window)) // main loop
 	{
 		glClearColor(0.07f, 0.13f, 0.17f, 1.0f); // background color
 		glClear(GL_COLOR_BUFFER_BIT); // clean the back buffer and assign new color to it
 		shaderProgram.Activate(); // set the Shader Program we want to use
+		glUniform1f(uniID, 0.5f); // set the value for "scale"
 		VAO1.Bind(); // set as current VAO
 		glDrawElements(GL_TRIANGLES, 9, GL_UNSIGNED_INT, 0); // draw triangles, passing in: number of indices, datatype of indices, index of indices
 		glfwSwapBuffers(window); // makes sure image is updated each frame
