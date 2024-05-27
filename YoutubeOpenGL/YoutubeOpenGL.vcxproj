@@ -71,12 +71,12 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>E:\Chris Yan\OpenGL Projects\YoutubeOpenGL\YoutubeOpenGL\Libraries\include;$(IncludePath)</IncludePath>
-    <LibraryPath>E:\Chris Yan\OpenGL Projects\YoutubeOpenGL\YoutubeOpenGL\Libraries\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(ProjectDir)\Libraries\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(ProjectDir)\Libraries\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>E:\Chris Yan\OpenGL Projects\YoutubeOpenGL\YoutubeOpenGL\Libraries\include;$(IncludePath)</IncludePath>
-    <LibraryPath>E:\Chris Yan\OpenGL Projects\YoutubeOpenGL\YoutubeOpenGL\Libraries\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(ProjectDir)\Libraries\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(ProjectDir)\Libraries\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
