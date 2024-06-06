@@ -9,71 +9,6 @@
 #include "VBO.h"
 #include "EBO.h"
 
-struct vec3
-{
-    float x;
-    float y;
-    float z;
-};
-
-struct vec4
-{
-    float w;
-    float x;
-    float y;
-    float z;
-};
-
-vec3 Normalize(const vec3& v)
-{
-    float magnitude = std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
-    if (magnitude <= 0.f)
-    {
-        return v;
-    }
-    return vec3{ v.x / magnitude, v.y / magnitude, v.z / magnitude };
-}
-
-vec4 CreateQuaternion(float theta, const vec3& axis)
-{
-    vec3 axisNorm = Normalize(axis);
-    float w = std::cos(theta / 2);
-    float x = std::sin(theta / 2) * axisNorm.x;
-    float y = std::sin(theta / 2) * axisNorm.y;
-    float z = std::sin(theta / 2) * axisNorm.z;
-    return vec4{ w, x, y, z };
-}
-
-vec4 MultiplyQuaternions(const vec4& q1, const vec4& q2)
-{
-    float w = q1.w * q2.w - q1.x * q2.x - q1.y * q2.y - q1.z * q2.z;
-    float x = q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y;
-    float y = q1.w * q2.y - q1.x * q2.z + q1.y * q2.w + q1.z * q2.x;
-    float z = q1.w * q2.z + q1.x * q2.y - q1.y * q2.y + q1.z * q2.w;
-    return vec4{ w, x, y, z };
-}
-
-std::array<float, 16> QuaternionAsMatrix(const vec4& quat)
-{
-    /* Column-major order */
-    return std::array<float, 16>
-    {
-         quat.w,  quat.x,  quat.y,  quat.z,
-        -quat.x,  quat.w,  quat.z, -quat.y,
-        -quat.y, -quat.z,  quat.w,  quat.x,
-        -quat.z,  quat.y, -quat.x,  quat.w
-    };
-
-    /* Row-major order */
-    //return std::array<float, 16>
-    //{
-    //    quat.w, -quat.x, -quat.y, -quat.z,
-    //    quat.x,  quat.w, -quat.z,  quat.y,
-    //    quat.y,  quat.z,  quat.w, -quat.x,
-    //    quat.z, -quat.y,  quat.x,  quat.w
-    //};
-}
-
 int main()
 {
     glfwInit(); // initialize GLFW
@@ -144,13 +79,6 @@ int main()
 
             GLint radiansLoc = glGetUniformLocation(shaderProgram.ID, "radians");
             glUniform1f(radiansLoc, theta);
-
-            /* Begin attempt quaternion rotation */
-            //const vec4 q = CreateQuaternion(theta, vec3{ 0.f, 0.f, 0.f });
-            //GLint rotationMatrixLoc = glGetUniformLocation(shaderProgram.ID, "rotationMatrix");
-            //float* quatAsMatPtr = QuaternionAsMatrix(q).data();
-            //glUniformMatrix4fv(rotationMatrixLoc, 1, GL_FALSE, quatAsMatPtr);
-            /* End attempt quaternion rotation */
         }
         
 
