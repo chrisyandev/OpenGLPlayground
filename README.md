@@ -1,4 +1,3 @@
-Following along with an OpenGL tutorial on YouTube
+Achieved something that looks 3D with minimal code.
 
-- https://www.youtube.com/playlist?list=PLPaoO-vpZnumdcb4tZc4x5Q-v7CkrQ6M-
-- https://github.com/VictorGordan/opengl-tutorials
+![RGB Pyramid](./rgb-pyramid.gif)

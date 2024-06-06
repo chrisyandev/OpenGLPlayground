@@ -76,16 +76,16 @@ int main()
         shaderProgram.Activate();
 
         double currTime = glfwGetTime();
-        if (currTime - prevTime >= (1.f / 60.f))
+        double deltaTime = currTime - prevTime;
+        if (deltaTime >= (1.f / 60.f))
         {
-            theta += 0.1f;
+            theta += 0.5f * deltaTime;
             prevTime = currTime;
 
             GLint radiansLoc = glGetUniformLocation(shaderProgram.ID, "radians");
             glUniform1f(radiansLoc, theta);
         }
         
-
         vertexArrayObject.Bind();
         glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0); // draw the elements using GL_TRIANGLES primitive
         
