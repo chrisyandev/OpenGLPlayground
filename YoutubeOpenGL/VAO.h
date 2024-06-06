@@ -6,7 +6,7 @@ class VAO
 {
 public:
     VAO();
-    void LinkVBO(VBO& VBO, GLuint attribIndex, GLuint attribNumComponents, GLenum attribType);
+    void LinkVBO(VBO& VBO, GLuint attribIndex, GLuint attribNumComponents, GLenum attribType, GLboolean isNormalized, GLsizei stride, const GLvoid* startOffset);
     void Bind();
     void Unbind();
     void Delete();

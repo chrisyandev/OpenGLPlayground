@@ -33,11 +33,12 @@ int main()
     // define triangle vertices for a triangle where the base sits on the x axis
     std::vector<GLfloat> vertices =
     {
-        0.f, 1.f, 0.f, // top vertex
-        -0.5f, 0.f, 0.5f, // front left vertex
-        0.5f, 0.f, 0.5, // front right vertex
-        -0.5f, 0.f, -0.5f, // back left vertex
-        0.5f, 0.f, -0.5, // back right vertex
+        // coords ---------- colors
+        0.f, 1.f, 0.f,      1.f, 0.f, 0.f,  // top vertex
+        -0.5f, 0.f, 0.5f,   0.f, 1.f, 0.f,  // front left vertex
+        0.5f, 0.f, 0.5,     0.f, 0.f, 1.f,  // front right vertex
+        -0.5f, 0.f, -0.5f,  1.f, 1.f, 0.f,  // back left vertex
+        0.5f, 0.f, -0.5,    0.f, 1.f, 1.f,  // back right vertex
     };
 
     // define order of vertices used to draw each triangle
@@ -55,7 +56,8 @@ int main()
     vertexArrayObject.Bind();
     VBO vertexBufferObject{ vertices };
     EBO elementBufferObject{ indices };
-    vertexArrayObject.LinkVBO(vertexBufferObject, 0, 3, GL_FLOAT);
+    vertexArrayObject.LinkVBO(vertexBufferObject, 0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)0);
+    vertexArrayObject.LinkVBO(vertexBufferObject, 1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
 
     vertexBufferObject.Unbind();
     vertexArrayObject.Unbind();
@@ -64,10 +66,12 @@ int main()
     float theta = 0.f;
     double prevTime = glfwGetTime();
 
+    glEnable(GL_DEPTH_TEST);
+
     while (!glfwWindowShouldClose(window)) // main loop
     {
         glClearColor(0.07f, 0.13f, 0.17f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         shaderProgram.Activate();
 
