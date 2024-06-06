@@ -7,6 +7,7 @@
 #include "ShaderProgram.h"
 #include "VAO.h"
 #include "VBO.h"
+#include "EBO.h"
 
 struct vec3
 {
@@ -104,15 +105,26 @@ int main()
         0.5f, 0.f, -0.5, // back right vertex
     };
 
+    // define order of vertices used to draw each triangle
+    std::vector<GLuint> indices =
+    {
+        0, 1, 2, // front of pyramid
+        0, 3, 1, // left of pyramid
+        0, 4, 2, // right of pyramid
+        0, 4, 3  // back of pyramid
+    };
+
     ShaderProgram shaderProgram{ "default.vert", "default.frag" };
 
     VAO vertexArrayObject{};
     vertexArrayObject.Bind();
     VBO vertexBufferObject{ vertices };
+    EBO elementBufferObject{ indices };
     vertexArrayObject.LinkVBO(vertexBufferObject, 0, 3, GL_FLOAT);
 
     vertexBufferObject.Unbind();
     vertexArrayObject.Unbind();
+    elementBufferObject.Unbind();
 
     float theta = 0.f;
     double prevTime = glfwGetTime();
@@ -143,7 +155,7 @@ int main()
         
 
         vertexArrayObject.Bind();
-        glDrawArrays(GL_TRIANGLES, 0, 3); // draw the triangle using GL_TRIANGLES primitive
+        glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0); // draw the elements using GL_TRIANGLES primitive
         
         glfwSwapBuffers(window); // makes sure image is updated each frame
         glfwPollEvents(); // takes care of all GLFW events
@@ -151,6 +163,7 @@ int main()
 
     vertexArrayObject.Delete();
     vertexBufferObject.Delete();
+    elementBufferObject.Delete();
     shaderProgram.Delete();
 
     glfwDestroyWindow(window); // delete window
