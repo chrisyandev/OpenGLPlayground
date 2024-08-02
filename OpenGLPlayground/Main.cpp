@@ -17,7 +17,7 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3); // OpenGL 3.3
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); // using the CORE profile so that we only have modern functions
 
-    GLFWwindow* window = glfwCreateWindow(800, 800, "YoutubeOpenGL", NULL, NULL); // create a window of 800 by 800 pixels with a title
+    GLFWwindow* window = glfwCreateWindow(800, 800, "OpenGLPlayground", NULL, NULL); // create a window of 800 by 800 pixels with a title
     if (window == NULL)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
