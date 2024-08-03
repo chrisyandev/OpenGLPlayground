@@ -2,12 +2,18 @@
 #include <GLFW/glfw3.h>
 #include <iostream>
 
+void init(GLFWwindow* window);
 void display(GLFWwindow* window, double currentTime);
 void processInput(GLFWwindow* window);
 void framebufferSizeCallback(GLFWwindow* window, int width, int height);
+GLuint createShaderProgram();
 
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
+constexpr unsigned int SCR_WIDTH = 800;
+constexpr unsigned int SCR_HEIGHT = 600;
+constexpr unsigned int NUM_VAOS = 1;
+
+GLuint renderingProgram;
+GLuint vao[NUM_VAOS];
 
 int main()
 {
@@ -35,6 +41,8 @@ int main()
         exit(EXIT_FAILURE);
     }
 
+    init(window);
+
     while (!glfwWindowShouldClose(window))
     {
         processInput(window);
@@ -47,9 +55,17 @@ int main()
     exit(EXIT_SUCCESS);
 }
 
+void init(GLFWwindow* window)
+{
+    renderingProgram = createShaderProgram();
+    glGenVertexArrays(NUM_VAOS, vao);
+    glBindVertexArray(vao[0]);
+}
+
 void display(GLFWwindow* window, double currentTime) {
-    glClearColor(1.0, 0.0, 0.0, 1.0);
-    glClear(GL_COLOR_BUFFER_BIT);
+    glUseProgram(renderingProgram);
+    glPointSize(30.0f);
+    glDrawArrays(GL_POINTS, 0, 1);
 }
 
 void processInput(GLFWwindow* window)
@@ -63,4 +79,33 @@ void processInput(GLFWwindow* window)
 void framebufferSizeCallback(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);
+}
+
+GLuint createShaderProgram()
+{
+    const char* vShaderSource =
+        "#version 430 \n"
+        "void main(void) \n"
+        "{ gl_Position = vec4(0.0, 0.0, 0.0, 1.0); }";
+
+    const char* fShaderSource =
+        "#version 430 \n"
+        "out vec4 color; \n"
+        "void main(void) \n"
+        "{ color = vec4(0.0, 0.0, 1.0, 1.0); }";
+
+    GLuint vShader = glCreateShader(GL_VERTEX_SHADER);
+    GLuint fShader = glCreateShader(GL_FRAGMENT_SHADER);
+
+    glShaderSource(vShader, 1, &vShaderSource, NULL);
+    glShaderSource(fShader, 1, &fShaderSource, NULL);
+    glCompileShader(vShader);
+    glCompileShader(fShader);
+
+    GLuint vfProgram = glCreateProgram();
+    glAttachShader(vfProgram, vShader);
+    glAttachShader(vfProgram, fShader);
+    glLinkProgram(vfProgram);
+
+    return vfProgram;
 }
