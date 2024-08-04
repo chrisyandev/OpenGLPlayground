@@ -7,6 +7,7 @@ void display(GLFWwindow* window, double currentTime);
 void processInput(GLFWwindow* window);
 void framebufferSizeCallback(GLFWwindow* window, int width, int height);
 GLuint createShaderProgram();
+void checkCompileErrors(GLuint shader, std::string type);
 
 constexpr unsigned int SCR_WIDTH = 800;
 constexpr unsigned int SCR_HEIGHT = 600;
@@ -98,9 +99,12 @@ GLuint createShaderProgram()
     GLuint fShader = glCreateShader(GL_FRAGMENT_SHADER);
 
     glShaderSource(vShader, 1, &vShaderSource, NULL);
-    glShaderSource(fShader, 1, &fShaderSource, NULL);
     glCompileShader(vShader);
+    checkCompileErrors(vShader, "VERTEX");
+    
+    glShaderSource(fShader, 1, &fShaderSource, NULL);
     glCompileShader(fShader);
+    checkCompileErrors(fShader, "FRAGMENT");
 
     GLuint vfProgram = glCreateProgram();
     glAttachShader(vfProgram, vShader);
@@ -108,4 +112,28 @@ GLuint createShaderProgram()
     glLinkProgram(vfProgram);
 
     return vfProgram;
+}
+
+void checkCompileErrors(GLuint shader, std::string type)
+{
+    GLint compiled;
+    GLchar infoLog[1024];
+    if (type != "PROGRAM")
+    {
+        glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
+        if (compiled != GL_TRUE)
+        {
+            glGetShaderInfoLog(shader, 1024, NULL, infoLog);
+            std::cout << "ERROR::SHADER_COMPILATION_ERROR of type: " << type << "\n" << infoLog << "\n -- --------------------------------------------------- -- " << std::endl;
+        }
+    }
+    else
+    {
+        glGetProgramiv(shader, GL_LINK_STATUS, &compiled);
+        if (compiled != GL_TRUE)
+        {
+            glGetProgramInfoLog(shader, 1024, NULL, infoLog);
+            std::cout << "ERROR::PROGRAM_LINKING_ERROR of type: " << type << "\n" << infoLog << "\n -- --------------------------------------------------- -- " << std::endl;
+        }
+    }
 }
