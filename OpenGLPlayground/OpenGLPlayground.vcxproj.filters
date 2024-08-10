@@ -18,8 +18,24 @@
     <ClCompile Include="..\ThirdParty\glad.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Private\Main.cpp">
+    <ClCompile Include="Private\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Private\Utils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\vertShader.glsl">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="Resources\fragShader.glsl">
+      <Filter>Resource Files</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Public\Utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

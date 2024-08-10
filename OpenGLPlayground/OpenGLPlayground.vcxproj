@@ -20,7 +20,15 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\ThirdParty\glad.c" />
-    <ClCompile Include="Private\Main.cpp" />
+    <ClCompile Include="Private\main.cpp" />
+    <ClCompile Include="Private\Utils.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\fragShader.glsl" />
+    <None Include="Resources\vertShader.glsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Public\Utils.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
@@ -79,7 +87,7 @@
     <LibraryPath>D:\OpenGL Projects\OpenGLPlayground\Library;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>D:\OpenGL Projects\OpenGLPlayground\ThirdParty\Include;$(IncludePath)</IncludePath>
+    <IncludePath>D:\OpenGL Projects\OpenGLPlayground\OpenGLPlayground\Public;D:\OpenGL Projects\OpenGLPlayground\ThirdParty\Include;$(IncludePath)</IncludePath>
     <LibraryPath>D:\OpenGL Projects\OpenGLPlayground\ThirdParty\Library;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -116,6 +124,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
