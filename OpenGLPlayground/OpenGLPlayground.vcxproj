@@ -87,8 +87,8 @@
     <LibraryPath>D:\OpenGL Projects\OpenGLPlayground\Library;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>D:\OpenGL Projects\OpenGLPlayground\OpenGLPlayground\Public;D:\OpenGL Projects\OpenGLPlayground\ThirdParty\Include;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\OpenGL Projects\OpenGLPlayground\ThirdParty\Library;$(LibraryPath)</LibraryPath>
+    <IncludePath>..\ThirdParty\Include;Public;$(IncludePath)</IncludePath>
+    <LibraryPath>..\ThirdParty\Library;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
