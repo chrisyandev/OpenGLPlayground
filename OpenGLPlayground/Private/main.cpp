@@ -96,6 +96,11 @@ void display(GLFWwindow* window, double currentTime)
     glClear(GL_COLOR_BUFFER_BIT);
     glUseProgram(renderingProgram);
 
+    // settings
+    glEnable(GL_CULL_FACE);
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_LEQUAL); // passes if the incoming depth value is less than or equal to the stored depth value
+
     // reference uniform variables
     mvLoc = glGetUniformLocation(renderingProgram, "mv_matrix");
     pLoc = glGetUniformLocation(renderingProgram, "p_matrix");
@@ -116,8 +121,7 @@ void display(GLFWwindow* window, double currentTime)
     glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(0);
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_LEQUAL);
+    glFrontFace(GL_CCW); // the pyramid vertices have counter-clockwise winding order
     glDrawArrays(GL_TRIANGLES, 0, 18); // draw the sun
     mvStack.pop(); // remove the sun’s axial rotation from the stack
 
@@ -130,6 +134,7 @@ void display(GLFWwindow* window, double currentTime)
     glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(0);
+    glFrontFace(GL_CW); // the cube vertices have clockwise winding order
     glDrawArrays(GL_TRIANGLES, 0, 36); // draw the planet
     mvStack.pop(); // remove the planet’s axial rotation from the stack
 
