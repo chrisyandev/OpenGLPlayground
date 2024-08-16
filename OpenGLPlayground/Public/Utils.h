@@ -10,6 +10,8 @@ class Utils
 public:
     static std::string readShaderSource(const char* filePath);
     static GLuint createShaderProgram(const char* vp, const char* fp);
+    static GLuint loadTexture(const char* texImagePath);
+
 private:
     static void checkCompileErrors(GLuint shader, std::string type);
 };

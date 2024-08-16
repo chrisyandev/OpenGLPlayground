@@ -1,4 +1,5 @@
 #include "Utils.h"
+#include <SOIL2/SOIL2.h>
 
 std::string Utils::readShaderSource(const char* filePath)
 {
@@ -63,4 +64,15 @@ void Utils::checkCompileErrors(GLuint shader, std::string type)
             std::cout << "ERROR::PROGRAM_LINKING_ERROR of type: " << type << "\n" << infoLog << "\n -- --------------------------------------------------- -- " << std::endl;
         }
     }
+}
+
+GLuint Utils::loadTexture(const char* texImagePath)
+{
+    GLuint textureID;
+    textureID = SOIL_load_OGL_texture(texImagePath, SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, SOIL_FLAG_INVERT_Y);
+    if (textureID == 0)
+    {
+        std::cout << "could not find texture file" << texImagePath << std::endl;
+    }
+    return textureID;
 }
