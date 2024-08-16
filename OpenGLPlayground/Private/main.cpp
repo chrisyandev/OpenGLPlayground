@@ -83,6 +83,11 @@ void init(GLFWwindow* window)
     pyrPosX = 0.0f; pyrPosY = 0.0f; pyrPosZ = 0.0f;
 
     setupVertices();
+
+    // build perspective matrix
+    glfwGetFramebufferSize(window, &width, &height);
+    aspect = (float)width / (float)height;
+    pMat = glm::perspective(1.0472f, aspect, 0.1f, 1000.0f); // 1.0472 radians = 60 degrees
 }
 
 void display(GLFWwindow* window, double currentTime)
@@ -95,10 +100,7 @@ void display(GLFWwindow* window, double currentTime)
     mvLoc = glGetUniformLocation(renderingProgram, "mv_matrix");
     pLoc = glGetUniformLocation(renderingProgram, "p_matrix");
 
-    // build and copy perspective matrix
-    glfwGetFramebufferSize(window, &width, &height);
-    aspect = (float)width / (float)height;
-    pMat = glm::perspective(1.0472f, aspect, 0.1f, 1000.0f); // 1.0472 radians = 60 degrees
+    // copy perspective matrix
     glUniformMatrix4fv(pLoc, 1, GL_FALSE, glm::value_ptr(pMat));
 
     // push view matrix onto the stack
@@ -146,6 +148,14 @@ void display(GLFWwindow* window, double currentTime)
     mvStack.pop(); mvStack.pop(); mvStack.pop(); mvStack.pop();
 }
 
+void window_reshape_callback(GLFWwindow* window, int newWidth, int newHeight)
+{
+    // update perspective matrix
+    aspect = (float)width / (float)height; // new width & height provided by the callback
+    glViewport(0, 0, newWidth, newHeight); // set screen region associated with framebuffer
+    pMat = glm::perspective(1.0472f, aspect, 0.1f, 1000.0f); // 1.0472 radians = 60 degrees
+}
+
 int main(void)
 {
     if (!glfwInit())
@@ -170,6 +180,8 @@ int main(void)
         std::cout << "Failed to initialize GLAD" << std::endl;
         exit(EXIT_FAILURE);
     }
+
+    glfwSetWindowSizeCallback(window, window_reshape_callback);
 
     init(window);
 
