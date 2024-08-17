@@ -30,6 +30,9 @@
   <ItemGroup>
     <ClInclude Include="Public\Utils.h" />
   </ItemGroup>
+  <ItemGroup>
+    <Image Include="Resources\brick1.jpg" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>

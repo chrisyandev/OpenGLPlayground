@@ -14,8 +14,9 @@
 constexpr GLuint SCR_WIDTH = 800;
 constexpr GLuint SCR_HEIGHT = 600;
 constexpr GLuint NUM_VAOS = 1;
-constexpr GLuint NUM_VBOS = 2;
+constexpr GLuint NUM_VBOS = 3;
 
+std::string resourcePath;
 float cameraX, cameraY, cameraZ;
 float cubePosX, cubePosY, cubePosZ, pyrPosX, pyrPosY, pyrPosZ;
 GLuint renderingProgram;
@@ -28,6 +29,7 @@ int width, height;
 float aspect;
 glm::mat4 pMat, vMat, mMat;
 std::stack<glm::mat4> mvStack;
+GLuint brickTexture;
 
 void setupVertices()
 {
@@ -59,6 +61,13 @@ void setupVertices()
          1.0f, -1.0f, 1.0f, -1.0f, -1.0f, -1.0f, 1.0f, -1.0f, -1.0f // base right back
     };
 
+    float pyrTexCoords[36] =
+    {
+         0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 1.0f,   0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 1.0f, // top and right faces
+         0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 1.0f,   0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 1.0f, // back and left faces
+         0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f,   1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f  // base triangles
+    };
+
     glGenVertexArrays(NUM_VAOS, vao);
     glBindVertexArray(*vao);
 
@@ -69,13 +78,16 @@ void setupVertices()
     
     glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
     glBufferData(GL_ARRAY_BUFFER, sizeof(pyramidPositions), pyramidPositions, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[2]);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(pyrTexCoords), pyrTexCoords, GL_STATIC_DRAW);
 }
 
 void init(GLFWwindow* window)
 {
-    std::filesystem::path currentPath = std::filesystem::current_path();
-    std::string vertShaderPath = currentPath.string() + "\\Resources\\vertShader.glsl";
-    std::string fragShaderPath = currentPath.string() + "\\Resources\\fragShader.glsl";
+    resourcePath = std::filesystem::current_path().string() + "\\Resources\\";
+    std::string vertShaderPath = resourcePath + "vertShader.glsl";
+    std::string fragShaderPath = resourcePath + "fragShader.glsl";
     renderingProgram = Utils::createShaderProgram(vertShaderPath.c_str(), fragShaderPath.c_str());
 
     cameraX = 0.0f; cameraY = 0.0f; cameraZ = 8.0f;
@@ -88,6 +100,8 @@ void init(GLFWwindow* window)
     glfwGetFramebufferSize(window, &width, &height);
     aspect = (float)width / (float)height;
     pMat = glm::perspective(1.0472f, aspect, 0.1f, 1000.0f); // 1.0472 radians = 60 degrees
+
+    brickTexture = Utils::loadTexture(resourcePath, "brick1.jpg");
 }
 
 void display(GLFWwindow* window, double currentTime)
@@ -122,8 +136,16 @@ void display(GLFWwindow* window, double currentTime)
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(0);
     glFrontFace(GL_CCW); // the pyramid vertices have counter-clockwise winding order
+        // --- pyramid texturing ---
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[2]);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(1);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, brickTexture);
+        // -------------------------
     glDrawArrays(GL_TRIANGLES, 0, 18); // draw the sun
     mvStack.pop(); // remove the sun’s axial rotation from the stack
+    // ----------------------------------------------------------------------------------
 
     //----------------------- cube == planet ---------------------------------------------
     mvStack.push(mvStack.top());
