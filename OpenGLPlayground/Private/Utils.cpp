@@ -74,5 +74,16 @@ GLuint Utils::loadTexture(std::string directoryPath, std::string texImageName)
     {
         std::cout << "could not find texture file " << texImageName << " in directory " << directoryPath << std::endl;
     }
+
+    // if mipmapping
+    glBindTexture(GL_TEXTURE_2D, textureID);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    
+    // if also anisotropic filtering
+    GLfloat anisoSetting = 0.0f;
+    glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &anisoSetting);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, anisoSetting);
+
     return textureID;
 }
