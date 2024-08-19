@@ -10,11 +10,12 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include "Utils.h"
+#include "Sphere.h"
 
 constexpr GLuint SCR_WIDTH = 800;
 constexpr GLuint SCR_HEIGHT = 600;
 constexpr GLuint NUM_VAOS = 1;
-constexpr GLuint NUM_VBOS = 3;
+constexpr GLuint NUM_VBOS = 6;
 
 std::string resourcePath;
 float cameraX, cameraY, cameraZ;
@@ -22,6 +23,7 @@ float cubePosX, cubePosY, cubePosZ, pyrPosX, pyrPosY, pyrPosZ;
 GLuint renderingProgram;
 GLuint vao[NUM_VAOS];
 GLuint vbo[NUM_VBOS];
+Sphere mySphere(48);
 
 // allocate variables used in display() function, so that they won’t need to be allocated during rendering
 GLuint mvLoc, pLoc;
@@ -81,6 +83,37 @@ void setupVertices()
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo[2]);
     glBufferData(GL_ARRAY_BUFFER, sizeof(pyrTexCoords), pyrTexCoords, GL_STATIC_DRAW);
+
+    // ------------------------------ procedural sphere ------------------------------
+    std::vector<int> ind = mySphere.getIndices();
+    std::vector<glm::vec3> vert = mySphere.getVertices();
+    std::vector<glm::vec2> tex = mySphere.getTexCoords();
+    std::vector<glm::vec3> norm = mySphere.getNormals();
+    std::vector<float> pvalues; // vertex positions
+    std::vector<float> tvalues; // texture coordinates
+    std::vector<float> nvalues; // normal vectors
+
+    int numIndices = mySphere.getNumIndices();
+    for (int i = 0; i < numIndices; i++) {
+        pvalues.push_back((vert[ind[i]]).x);
+        pvalues.push_back((vert[ind[i]]).y);
+        pvalues.push_back((vert[ind[i]]).z);
+        tvalues.push_back((tex[ind[i]]).s);
+        tvalues.push_back((tex[ind[i]]).t);
+        nvalues.push_back((norm[ind[i]]).x);
+        nvalues.push_back((norm[ind[i]]).y);
+        nvalues.push_back((norm[ind[i]]).z);
+    }
+
+    // put the vertices into buffer #4
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[3]);
+    glBufferData(GL_ARRAY_BUFFER, pvalues.size() * 4, &pvalues[0], GL_STATIC_DRAW);
+    // put the texture coordinates into buffer #5
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[4]);
+    glBufferData(GL_ARRAY_BUFFER, tvalues.size() * 4, &tvalues[0], GL_STATIC_DRAW);
+    // put the normals into buffer #6
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[5]);
+    glBufferData(GL_ARRAY_BUFFER, nvalues.size() * 4, &nvalues[0], GL_STATIC_DRAW);
 }
 
 void init(GLFWwindow* window)
@@ -118,10 +151,10 @@ void display(GLFWwindow* window, double currentTime)
     // reference uniform variables
     mvLoc = glGetUniformLocation(renderingProgram, "mv_matrix");
     pLoc = glGetUniformLocation(renderingProgram, "p_matrix");
-
+    
     // copy perspective matrix
     glUniformMatrix4fv(pLoc, 1, GL_FALSE, glm::value_ptr(pMat));
-
+    
     // push view matrix onto the stack
     vMat = glm::translate(glm::mat4(1.0f), glm::vec3(-cameraX, -cameraY, -cameraZ));
     mvStack.push(vMat);
@@ -147,7 +180,7 @@ void display(GLFWwindow* window, double currentTime)
     mvStack.pop(); // remove the sun’s axial rotation from the stack
     // ----------------------------------------------------------------------------------
 
-    //----------------------- cube == planet ---------------------------------------------
+    // ----------------------- cube == planet -------------------------------------------
     mvStack.push(mvStack.top());
     mvStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(sin((float)currentTime) * 4.0, 0.0f, cos((float)currentTime) * 4.0));
     mvStack.push(mvStack.top());
@@ -160,7 +193,7 @@ void display(GLFWwindow* window, double currentTime)
     glDrawArrays(GL_TRIANGLES, 0, 36); // draw the planet
     mvStack.pop(); // remove the planet’s axial rotation from the stack
 
-    //----------------------- smaller cube == moon -----------------------------------
+    // ----------------------- smaller cube == moon -------------------------------------
     mvStack.push(mvStack.top());
     mvStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, sin((float)currentTime) * 2.0, cos((float)currentTime) * 2.0));
     mvStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0, 0.0, 1.0)); // moon rotation
@@ -172,7 +205,35 @@ void display(GLFWwindow* window, double currentTime)
     glDrawArrays(GL_TRIANGLES, 0, 36); // draw the moon
     
     // remove moon scale/rotation/position, planet position, sun position, and view matrices from stack
-    mvStack.pop(); mvStack.pop(); mvStack.pop(); mvStack.pop();
+    mvStack.pop();
+    mvStack.pop();
+    mvStack.pop();
+    mvStack.pop();
+    // ----------------------------------------------------------------------------------
+
+    // ------------------------------ procedural sphere ---------------------------------
+    mvStack.push(vMat);
+    mvStack.push(mvStack.top());
+    mvStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+    mvStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, 1.0f, 1.0f));
+    glUniformMatrix4fv(mvLoc, 1, GL_FALSE, glm::value_ptr(mvStack.top()));
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[3]);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(0);
+    glFrontFace(GL_CCW); // the sphere vertices have clockwise winding order
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[4]);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0); // specify layout of tex coords
+    glEnableVertexAttribArray(1); // enable vert shader to access tex coords stored in VBO
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE0, brickTexture);
+
+    glDrawArrays(GL_TRIANGLES, 0, mySphere.getNumIndices());
+
+    mvStack.pop();
+    mvStack.pop();
+    // ----------------------------------------------------------------------------------
 }
 
 void window_reshape_callback(GLFWwindow* window, int newWidth, int newHeight)
