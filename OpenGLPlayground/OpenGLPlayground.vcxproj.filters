@@ -27,6 +27,9 @@
     <ClCompile Include="Private\Sphere.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Private\Torus.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\vertShader.glsl">
@@ -43,9 +46,15 @@
     <ClInclude Include="Public\Sphere.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Public\Torus.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="Resources\brick1.jpg">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Resources\earthmap1k.jpg">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>

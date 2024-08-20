@@ -11,6 +11,7 @@ public:
     static std::string readShaderSource(const char* filePath);
     static GLuint createShaderProgram(const char* vp, const char* fp);
     static GLuint loadTexture(std::string directoryPath, std::string texImageName);
+    static float toRadians(float degrees);
 
 private:
     static void checkCompileErrors(GLuint shader, std::string type);

@@ -11,11 +11,12 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include "Utils.h"
 #include "Sphere.h"
+#include "Torus.h"
 
 constexpr GLuint SCR_WIDTH = 800;
 constexpr GLuint SCR_HEIGHT = 600;
 constexpr GLuint NUM_VAOS = 1;
-constexpr GLuint NUM_VBOS = 6;
+constexpr GLuint NUM_VBOS = 10;
 
 std::string resourcePath;
 float cameraX, cameraY, cameraZ;
@@ -24,6 +25,7 @@ GLuint renderingProgram;
 GLuint vao[NUM_VAOS];
 GLuint vbo[NUM_VBOS];
 Sphere mySphere(48);
+Torus myTorus(0.5f, 0.2f, 48);
 
 // allocate variables used in display() function, so that they won’t need to be allocated during rendering
 GLuint mvLoc, pLoc;
@@ -32,6 +34,7 @@ float aspect;
 glm::mat4 pMat, vMat, mMat;
 std::stack<glm::mat4> mvStack;
 GLuint brickTexture;
+GLuint earthTexture;
 
 void setupVertices()
 {
@@ -84,36 +87,80 @@ void setupVertices()
     glBindBuffer(GL_ARRAY_BUFFER, vbo[2]);
     glBufferData(GL_ARRAY_BUFFER, sizeof(pyrTexCoords), pyrTexCoords, GL_STATIC_DRAW);
 
-    // ------------------------------ procedural sphere ------------------------------
-    std::vector<int> ind = mySphere.getIndices();
-    std::vector<glm::vec3> vert = mySphere.getVertices();
-    std::vector<glm::vec2> tex = mySphere.getTexCoords();
-    std::vector<glm::vec3> norm = mySphere.getNormals();
-    std::vector<float> pvalues; // vertex positions
-    std::vector<float> tvalues; // texture coordinates
-    std::vector<float> nvalues; // normal vectors
+    // ------------------------------ procedural sphere -------------------------------
+    std::vector<int> sphIdxs = mySphere.getIndices();
+    std::vector<glm::vec3> sphVerts = mySphere.getVertices();
+    std::vector<glm::vec2> sphTexs = mySphere.getTexCoords();
+    std::vector<glm::vec3> sphNorms = mySphere.getNormals();
+    std::vector<float> sphPosVals; // vertex positions
+    std::vector<float> sphTexVals; // texture coordinates
+    std::vector<float> sphNormVals; // normal vectors
 
-    int numIndices = mySphere.getNumIndices();
-    for (int i = 0; i < numIndices; i++) {
-        pvalues.push_back((vert[ind[i]]).x);
-        pvalues.push_back((vert[ind[i]]).y);
-        pvalues.push_back((vert[ind[i]]).z);
-        tvalues.push_back((tex[ind[i]]).s);
-        tvalues.push_back((tex[ind[i]]).t);
-        nvalues.push_back((norm[ind[i]]).x);
-        nvalues.push_back((norm[ind[i]]).y);
-        nvalues.push_back((norm[ind[i]]).z);
+    // flatten every vector into array of floats
+    int sphNumIdxs = mySphere.getNumIndices();
+    for (int i = 0; i < sphNumIdxs; i++)
+    {
+        sphPosVals.push_back(sphVerts[sphIdxs[i]].x);
+        sphPosVals.push_back(sphVerts[sphIdxs[i]].y);
+        sphPosVals.push_back(sphVerts[sphIdxs[i]].z);
+
+        sphTexVals.push_back(sphTexs[sphIdxs[i]].s);
+        sphTexVals.push_back(sphTexs[sphIdxs[i]].t);
+
+        sphNormVals.push_back(sphNorms[sphIdxs[i]].x);
+        sphNormVals.push_back(sphNorms[sphIdxs[i]].y);
+        sphNormVals.push_back(sphNorms[sphIdxs[i]].z);
     }
 
     // put the vertices into buffer #4
     glBindBuffer(GL_ARRAY_BUFFER, vbo[3]);
-    glBufferData(GL_ARRAY_BUFFER, pvalues.size() * 4, &pvalues[0], GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sphPosVals.size() * 4, &sphPosVals[0], GL_STATIC_DRAW);
     // put the texture coordinates into buffer #5
     glBindBuffer(GL_ARRAY_BUFFER, vbo[4]);
-    glBufferData(GL_ARRAY_BUFFER, tvalues.size() * 4, &tvalues[0], GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sphTexVals.size() * 4, &sphTexVals[0], GL_STATIC_DRAW);
     // put the normals into buffer #6
     glBindBuffer(GL_ARRAY_BUFFER, vbo[5]);
-    glBufferData(GL_ARRAY_BUFFER, nvalues.size() * 4, &nvalues[0], GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sphNormVals.size() * 4, &sphNormVals[0], GL_STATIC_DRAW);
+    // ----------------------------------------------------------------------------------
+
+    // ------------------------------ procedural torus ----------------------------------
+    std::vector<int> torIdxs = myTorus.getIndices();
+    std::vector<glm::vec3> torVerts = myTorus.getVertices();
+    std::vector<glm::vec2> torTexs = myTorus.getTexCoords();
+    std::vector<glm::vec3> torNorms = myTorus.getNormals();
+    std::vector<float> torPosVals; // vertex positions
+    std::vector<float> torTexVals; // texture coordinates
+    std::vector<float> torNormVals; // normal vectors
+
+    // flatten every vector into array of floats
+    int torNumVerts = myTorus.getNumVertices();
+    for (int i = 0; i < torNumVerts; i++)
+    {
+        torPosVals.push_back(torVerts[i].x);
+        torPosVals.push_back(torVerts[i].y);
+        torPosVals.push_back(torVerts[i].z);
+
+        torTexVals.push_back(torTexs[i].s);
+        torTexVals.push_back(torTexs[i].t);
+
+        torNormVals.push_back(torNorms[i].x);
+        torNormVals.push_back(torNorms[i].y);
+        torNormVals.push_back(torNorms[i].z);
+    }
+
+    // put the vertices into buffer #7
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[6]);
+    glBufferData(GL_ARRAY_BUFFER, torPosVals.size() * 4, &torPosVals[0], GL_STATIC_DRAW);
+    // put the texture coordinates into buffer #8
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[7]);
+    glBufferData(GL_ARRAY_BUFFER, torTexVals.size() * 4, &torTexVals[0], GL_STATIC_DRAW);
+    // put the normals into buffer #9
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[8]);
+    glBufferData(GL_ARRAY_BUFFER, torNormVals.size() * 4, &torNormVals[0], GL_STATIC_DRAW);
+    // put the indices into buffer #10
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo[9]);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, torIdxs.size() * 4, &torIdxs[0], GL_STATIC_DRAW);
+    // ----------------------------------------------------------------------------------
 }
 
 void init(GLFWwindow* window)
@@ -135,6 +182,7 @@ void init(GLFWwindow* window)
     pMat = glm::perspective(1.0472f, aspect, 0.1f, 1000.0f); // 1.0472 radians = 60 degrees
 
     brickTexture = Utils::loadTexture(resourcePath, "brick1.jpg");
+    earthTexture = Utils::loadTexture(resourcePath, "earthmap1k.jpg");
 }
 
 void display(GLFWwindow* window, double currentTime)
@@ -214,7 +262,7 @@ void display(GLFWwindow* window, double currentTime)
     // ------------------------------ procedural sphere ---------------------------------
     mvStack.push(vMat);
     mvStack.push(mvStack.top());
-    mvStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+    mvStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(-2.0f, 0.0f, 0.0f));
     mvStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, 1.0f, 1.0f));
     glUniformMatrix4fv(mvLoc, 1, GL_FALSE, glm::value_ptr(mvStack.top()));
 
@@ -227,9 +275,35 @@ void display(GLFWwindow* window, double currentTime)
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0); // specify layout of tex coords
     glEnableVertexAttribArray(1); // enable vert shader to access tex coords stored in VBO
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE0, brickTexture);
+    glBindTexture(GL_TEXTURE_2D, earthTexture);
 
     glDrawArrays(GL_TRIANGLES, 0, mySphere.getNumIndices());
+
+    mvStack.pop();
+    mvStack.pop();
+    // ----------------------------------------------------------------------------------
+
+    // ------------------------------ procedural torus ----------------------------------
+    mvStack.push(vMat);
+    mvStack.push(mvStack.top());
+    mvStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(2.0f, 0.0f, 0.0f));
+    mvStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(2.0f, 2.0f, 2.0f));
+    mvStack.top() *= glm::rotate(glm::mat4(1.0f), Utils::toRadians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+    glUniformMatrix4fv(mvLoc, 1, GL_FALSE, glm::value_ptr(mvStack.top()));
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[6]);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(0);
+    glFrontFace(GL_CCW);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[7]);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(1);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, brickTexture);
+    
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo[9]);
+    glDrawElements(GL_TRIANGLES, myTorus.getNumIndices(), GL_UNSIGNED_INT, 0);
 
     mvStack.pop();
     mvStack.pop();

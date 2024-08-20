@@ -2,6 +2,7 @@
 #include <vector>
 #include <iostream>
 #include <glm/glm.hpp>
+#include "Utils.h"
 #include "Sphere.h"
 
 Sphere::Sphere()
@@ -42,9 +43,9 @@ void Sphere::init(int numSlices)
 	{
 		for (int j = 0; j <= numSlices; j++) // for each vertical slice
 		{
-			float y = (float)cos(toRadians(180.0f - i * 180.0f / numSlices));
-			float x = -(float)cos(toRadians(j * 360.0f / numSlices)) * (float)abs(cos(asin(y)));
-			float z = (float)sin(toRadians(j * 360.0f / numSlices)) * (float)abs(cos(asin(y)));
+			float y = (float)cos(Utils::toRadians(180.0f - i * 180.0f / numSlices));
+			float x = -(float)cos(Utils::toRadians(j * 360.0f / numSlices)) * (float)abs(cos(asin(y)));
+			float z = (float)sin(Utils::toRadians(j * 360.0f / numSlices)) * (float)abs(cos(asin(y)));
 			vertices[i * (numSlices + 1) + j] = glm::vec3(x, y, z);
 			texCoords[i * (numSlices + 1) + j] = glm::vec2((float)j / numSlices, (float)i / numSlices);
 			normals[i * (numSlices + 1) + j] = glm::vec3(x, y, z);
@@ -64,9 +65,4 @@ void Sphere::init(int numSlices)
 			indices[6 * (i * numSlices + j) + 5] = (i + 1) * (numSlices + 1) + j;
 		}
 	}
-}
-
-float Sphere::toRadians(float degrees)
-{
-	return (degrees * 2.0f * 3.14159f) / 360.0f;
 }

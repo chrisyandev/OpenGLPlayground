@@ -22,6 +22,7 @@
     <ClCompile Include="..\ThirdParty\glad.c" />
     <ClCompile Include="Private\main.cpp" />
     <ClCompile Include="Private\Sphere.cpp" />
+    <ClCompile Include="Private\Torus.cpp" />
     <ClCompile Include="Private\Utils.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -30,10 +31,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Public\Sphere.h" />
+    <ClInclude Include="Public\Torus.h" />
     <ClInclude Include="Public\Utils.h" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="Resources\brick1.jpg" />
+    <Image Include="Resources\earthmap1k.jpg" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>

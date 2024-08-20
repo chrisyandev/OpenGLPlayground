@@ -77,7 +77,9 @@ GLuint Utils::loadTexture(std::string directoryPath, std::string texImageName)
 
     // if mipmapping
     glBindTexture(GL_TEXTURE_2D, textureID);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glGenerateMipmap(GL_TEXTURE_2D);
     
     // if also anisotropic filtering
@@ -86,4 +88,9 @@ GLuint Utils::loadTexture(std::string directoryPath, std::string texImageName)
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, anisoSetting);
 
     return textureID;
+}
+
+float Utils::toRadians(float degrees)
+{
+    return (degrees * 2.0f * 3.14159f) / 360.0f;
 }
