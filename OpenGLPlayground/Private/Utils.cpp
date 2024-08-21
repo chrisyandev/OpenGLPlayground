@@ -1,5 +1,16 @@
 #include "Utils.h"
 #include <SOIL2/SOIL2.h>
+#include <filesystem>
+
+std::string Utils::getCurrentPath()
+{
+    return std::filesystem::current_path().string() + "\\";
+}
+
+std::string Utils::getResourcePath()
+{
+    return getCurrentPath() + "Resources\\";
+}
 
 std::string Utils::readShaderSource(const char* filePath)
 {
@@ -42,7 +53,7 @@ GLuint Utils::createShaderProgram(const char* vp, const char* fp)
     return vfProgram;
 }
 
-void Utils::checkCompileErrors(GLuint shader, std::string type)
+void Utils::checkCompileErrors(GLuint shader, const std::string& type)
 {
     GLint compiled;
     GLchar infoLog[1024];
@@ -66,7 +77,7 @@ void Utils::checkCompileErrors(GLuint shader, std::string type)
     }
 }
 
-GLuint Utils::loadTexture(std::string directoryPath, std::string texImageName)
+GLuint Utils::loadTexture(const std::string& directoryPath, const std::string& texImageName)
 {
     GLuint textureID;
     textureID = SOIL_load_OGL_texture((directoryPath + texImageName).c_str(), SOIL_LOAD_AUTO, SOIL_CREATE_NEW_ID, SOIL_FLAG_INVERT_Y);

@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\ThirdParty\glad.c" />
+    <ClCompile Include="Private\ImportedModel.cpp" />
     <ClCompile Include="Private\main.cpp" />
     <ClCompile Include="Private\Sphere.cpp" />
     <ClCompile Include="Private\Torus.cpp" />
@@ -30,6 +31,7 @@
     <None Include="Resources\vertShader.glsl" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Public\ImportedModel.h" />
     <ClInclude Include="Public\Sphere.h" />
     <ClInclude Include="Public\Torus.h" />
     <ClInclude Include="Public\Utils.h" />

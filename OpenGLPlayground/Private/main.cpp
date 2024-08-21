@@ -3,7 +3,6 @@
 #include <string>
 #include <iostream>
 #include <fstream>
-#include <filesystem>
 #include <cmath>
 #include <stack>
 #include <glm/glm.hpp>
@@ -12,11 +11,12 @@
 #include "Utils.h"
 #include "Sphere.h"
 #include "Torus.h"
+#include "ImportedModel.h"
 
 constexpr GLuint SCR_WIDTH = 800;
 constexpr GLuint SCR_HEIGHT = 600;
 constexpr GLuint NUM_VAOS = 1;
-constexpr GLuint NUM_VBOS = 10;
+constexpr GLuint NUM_VBOS = 13;
 
 std::string resourcePath;
 float cameraX, cameraY, cameraZ;
@@ -26,6 +26,7 @@ GLuint vao[NUM_VAOS];
 GLuint vbo[NUM_VBOS];
 Sphere mySphere(48);
 Torus myTorus(0.5f, 0.2f, 48);
+ImportedModel myModel("shuttle.obj");
 
 // allocate variables used in display() function, so that they won’t need to be allocated during rendering
 GLuint mvLoc, pLoc;
@@ -35,6 +36,7 @@ glm::mat4 pMat, vMat, mMat;
 std::stack<glm::mat4> mvStack;
 GLuint brickTexture;
 GLuint earthTexture;
+GLuint shuttleTexture;
 
 void setupVertices()
 {
@@ -161,11 +163,43 @@ void setupVertices()
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo[9]);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, torIdxs.size() * 4, &torIdxs[0], GL_STATIC_DRAW);
     // ----------------------------------------------------------------------------------
+
+    // ------------------------------- imported model -----------------------------------
+    std::vector<glm::vec3> modVerts = myModel.getVertices();
+    std::vector<glm::vec2> modTexs = myModel.getTextureCoords();
+    std::vector<glm::vec3> modNorms = myModel.getNormals();
+    std::vector<float> modPosVals; // vertex positions
+    std::vector<float> modTexVals; // texture coordinates
+    std::vector<float> modNormVals; // normal vectors
+
+    int modNumVertices = myModel.getNumVertices();
+    for (int i = 0; i < modNumVertices; i++)
+    {
+        modPosVals.push_back(modVerts[i].x);
+        modPosVals.push_back(modVerts[i].y);
+        modPosVals.push_back(modVerts[i].z);
+        modTexVals.push_back(modTexs[i].s);
+        modTexVals.push_back(modTexs[i].t);
+        modNormVals.push_back(modNorms[i].x);
+        modNormVals.push_back(modNorms[i].y);
+        modNormVals.push_back(modNorms[i].z);
+    }
+
+    // put the vertices into buffer #11
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[10]);
+    glBufferData(GL_ARRAY_BUFFER, modPosVals.size() * 4, &modPosVals[0], GL_STATIC_DRAW);
+    // put the texture coordinates into buffer #12
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[11]);
+    glBufferData(GL_ARRAY_BUFFER, modTexVals.size() * 4, &modTexVals[0], GL_STATIC_DRAW);
+    // put the normals into buffer #13
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[12]);
+    glBufferData(GL_ARRAY_BUFFER, modNormVals.size() * 4, &modNormVals[0], GL_STATIC_DRAW);
+    // ----------------------------------------------------------------------------------
 }
 
 void init(GLFWwindow* window)
 {
-    resourcePath = std::filesystem::current_path().string() + "\\Resources\\";
+    resourcePath = Utils::getResourcePath();
     std::string vertShaderPath = resourcePath + "vertShader.glsl";
     std::string fragShaderPath = resourcePath + "fragShader.glsl";
     renderingProgram = Utils::createShaderProgram(vertShaderPath.c_str(), fragShaderPath.c_str());
@@ -183,6 +217,7 @@ void init(GLFWwindow* window)
 
     brickTexture = Utils::loadTexture(resourcePath, "brick1.jpg");
     earthTexture = Utils::loadTexture(resourcePath, "earthmap1k.jpg");
+    shuttleTexture = Utils::loadTexture(resourcePath, "spstob_1.jpg");
 }
 
 void display(GLFWwindow* window, double currentTime)
@@ -306,6 +341,29 @@ void display(GLFWwindow* window, double currentTime)
     glDrawElements(GL_TRIANGLES, myTorus.getNumIndices(), GL_UNSIGNED_INT, 0);
 
     mvStack.pop();
+    mvStack.pop();
+    // ----------------------------------------------------------------------------------
+
+    // ------------------------------- imported model -----------------------------------
+    mvStack.push(vMat);
+    mvStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(cos((float)currentTime) * 4.0f, sin((float)currentTime) * 4.0f, cos((float)currentTime) * 4.0f));
+    mvStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(1.0, 1.0, 0.0));
+    mvStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(4.0f, 4.0f, 4.0f));
+    glUniformMatrix4fv(mvLoc, 1, GL_FALSE, glm::value_ptr(mvStack.top()));
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[10]);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(0);
+    glFrontFace(GL_CCW);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[11]);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(1);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, shuttleTexture);
+    
+    glDrawArrays(GL_TRIANGLES, 0, myModel.getNumVertices());
+
     mvStack.pop();
     // ----------------------------------------------------------------------------------
 }
