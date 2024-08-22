@@ -1,6 +1,7 @@
 #version 430
 
 in vec2 texCoord;
+in vec4 varyingColor;
 
 uniform mat4 mv_matrix;
 uniform mat4 p_matrix;
@@ -12,4 +13,9 @@ layout (binding=0) uniform sampler2D samp; // (binding=0) means texture unit 0
 void main(void)
 {
     color = texture(samp, texCoord);
+
+    if (color == vec4(0.0, 0.0, 0.0, 1.0)) // if no texture
+    {
+        color = varyingColor;
+    }
 }

@@ -17,10 +17,10 @@ constexpr GLuint SCR_WIDTH = 800;
 constexpr GLuint SCR_HEIGHT = 600;
 constexpr GLuint NUM_VAOS = 1;
 constexpr GLuint NUM_VBOS = 13;
+constexpr GLsizei cubeStride = 5 * sizeof(float);
 
 std::string resourcePath;
 float cameraX, cameraY, cameraZ;
-float cubePosX, cubePosY, cubePosZ, pyrPosX, pyrPosY, pyrPosZ;
 GLuint renderingProgram;
 GLuint vao[NUM_VAOS];
 GLuint vbo[NUM_VBOS];
@@ -41,20 +41,50 @@ GLuint shuttleTexture;
 void setupVertices()
 {
     // 36 vertices, 12 triangles, makes 2x2x2 cube placed at origin
-    float cubePositions[108] =
+    float cubeVertices[] =
     {
-        -1.0f,  1.0f, -1.0f, -1.0f, -1.0f, -1.0f,  1.0f, -1.0f, -1.0f,
-         1.0f, -1.0f, -1.0f,  1.0f,  1.0f, -1.0f, -1.0f,  1.0f, -1.0f,
-         1.0f, -1.0f, -1.0f,  1.0f, -1.0f,  1.0f,  1.0f,  1.0f, -1.0f,
-         1.0f, -1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f, -1.0f,
-         1.0f, -1.0f,  1.0f, -1.0f, -1.0f,  1.0f,  1.0f,  1.0f,  1.0f,
-        -1.0f, -1.0f,  1.0f, -1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f,
-        -1.0f, -1.0f,  1.0f, -1.0f, -1.0f, -1.0f, -1.0f,  1.0f,  1.0f,
-        -1.0f, -1.0f, -1.0f, -1.0f,  1.0f, -1.0f, -1.0f,  1.0f,  1.0f,
-        -1.0f, -1.0f,  1.0f,  1.0f, -1.0f,  1.0f,  1.0f, -1.0f, -1.0f,
-         1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f,  1.0f,
-        -1.0f,  1.0f, -1.0f,  1.0f,  1.0f, -1.0f,  1.0f,  1.0f,  1.0f,
-         1.0f,  1.0f,  1.0f, -1.0f,  1.0f,  1.0f, -1.0f,  1.0f, -1.0f,
+        // Position           // Texture Coords
+        -1.0f,  1.0f, -1.0f,  0.0f, 1.0f, // Front face
+        -1.0f, -1.0f, -1.0f,  0.0f, 0.0f,
+         1.0f, -1.0f, -1.0f,  1.0f, 0.0f,
+         1.0f, -1.0f, -1.0f,  1.0f, 0.0f,
+         1.0f,  1.0f, -1.0f,  1.0f, 1.0f,
+        -1.0f,  1.0f, -1.0f,  0.0f, 1.0f,
+
+         1.0f, -1.0f, -1.0f,  0.0f, 0.0f, // Right face
+         1.0f, -1.0f,  1.0f,  1.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,  1.0f, 1.0f,
+         1.0f,  1.0f,  1.0f,  1.0f, 1.0f,
+         1.0f,  1.0f, -1.0f,  0.0f, 1.0f,
+         1.0f, -1.0f, -1.0f,  0.0f, 0.0f,
+
+         1.0f, -1.0f,  1.0f,  1.0f, 0.0f, // Back face
+        -1.0f, -1.0f,  1.0f,  0.0f, 0.0f,
+        -1.0f,  1.0f,  1.0f,  0.0f, 1.0f,
+        -1.0f,  1.0f,  1.0f,  0.0f, 1.0f,
+         1.0f,  1.0f,  1.0f,  1.0f, 1.0f,
+         1.0f, -1.0f,  1.0f,  1.0f, 0.0f,
+
+        -1.0f, -1.0f,  1.0f,  1.0f, 0.0f, // Left face
+        -1.0f, -1.0f, -1.0f,  0.0f, 0.0f,
+        -1.0f,  1.0f, -1.0f,  0.0f, 1.0f,
+        -1.0f,  1.0f, -1.0f,  0.0f, 1.0f,
+        -1.0f,  1.0f,  1.0f,  1.0f, 1.0f,
+        -1.0f, -1.0f,  1.0f,  1.0f, 0.0f,
+
+        -1.0f,  1.0f, -1.0f,  0.0f, 1.0f, // Top face
+         1.0f,  1.0f, -1.0f,  1.0f, 1.0f,
+         1.0f,  1.0f,  1.0f,  1.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,  1.0f, 0.0f,
+        -1.0f,  1.0f,  1.0f,  0.0f, 0.0f,
+        -1.0f,  1.0f, -1.0f,  0.0f, 1.0f,
+
+        -1.0f, -1.0f, -1.0f,  1.0f, 0.0f, // Bottom face
+         1.0f, -1.0f, -1.0f,  0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f,  0.0f, 1.0f,
+         1.0f, -1.0f,  1.0f,  0.0f, 1.0f,
+        -1.0f, -1.0f,  1.0f,  1.0f, 1.0f,
+        -1.0f, -1.0f, -1.0f,  1.0f, 0.0f
     };
 
     // pyramid with 18 vertices, comprising 6 triangles (four sides, and two on the bottom)
@@ -70,9 +100,24 @@ void setupVertices()
 
     float pyrTexCoords[36] =
     {
-         0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 1.0f,   0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 1.0f, // top and right faces
-         0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 1.0f,   0.0f, 0.0f, 1.0f, 0.0f, 0.5f, 1.0f, // back and left faces
-         0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f,   1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f  // base triangles
+         0.0f, 0.0f, // front face
+         1.0f, 0.0f, 
+         0.5f, 1.0f,    
+         0.0f, 0.0f, // right face
+         1.0f, 0.0f,  
+         0.5f, 1.0f,
+         0.0f, 0.0f, // back face
+         1.0f, 0.0f,  
+         0.5f, 1.0f,
+         0.0f, 0.0f, // left face
+         1.0f, 0.0f,
+         0.5f, 1.0f,
+         0.0f, 0.0f, // base triangle 1
+         1.0f, 1.0f,
+         0.0f, 1.0f,
+         1.0f, 1.0f, // base triangle 2
+         0.0f, 0.0f,
+         1.0f, 0.0f
     };
 
     glGenVertexArrays(NUM_VAOS, vao);
@@ -81,7 +126,7 @@ void setupVertices()
     glGenBuffers(NUM_VBOS, vbo);
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(cubePositions), cubePositions, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
     
     glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
     glBufferData(GL_ARRAY_BUFFER, sizeof(pyramidPositions), pyramidPositions, GL_STATIC_DRAW);
@@ -205,8 +250,6 @@ void init(GLFWwindow* window)
     renderingProgram = Utils::createShaderProgram(vertShaderPath.c_str(), fragShaderPath.c_str());
 
     cameraX = 0.0f; cameraY = 0.0f; cameraZ = 8.0f;
-    cubePosX = 0.0f; cubePosY = 0.0f; cubePosZ = 0.0f;
-    pyrPosX = 0.0f; pyrPosY = 0.0f; pyrPosZ = 0.0f;
 
     setupVertices();
 
@@ -268,11 +311,18 @@ void display(GLFWwindow* window, double currentTime)
     mvStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(sin((float)currentTime) * 4.0, 0.0f, cos((float)currentTime) * 4.0));
     mvStack.push(mvStack.top());
     mvStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0, 1.0, 0.0)); // planet rotation
+    mvStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(0.75f, 0.75f, 0.75f));
     glUniformMatrix4fv(mvLoc, 1, GL_FALSE, glm::value_ptr(mvStack.top()));
     glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, cubeStride, 0);
     glEnableVertexAttribArray(0);
     glFrontFace(GL_CW); // the cube vertices have clockwise winding order
+        // --- cube texturing ---
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, cubeStride, (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, brickTexture);
+        // -------------------------
     glDrawArrays(GL_TRIANGLES, 0, 36); // draw the planet
     mvStack.pop(); // remove the planet’s axial rotation from the stack
 
@@ -283,8 +333,9 @@ void display(GLFWwindow* window, double currentTime)
     mvStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(0.25f, 0.25f, 0.25f)); // make the moon smaller
     glUniformMatrix4fv(mvLoc, 1, GL_FALSE, glm::value_ptr(mvStack.top()));
     glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, cubeStride, 0);
     glEnableVertexAttribArray(0);
+    glBindTexture(GL_TEXTURE_2D, 0); // unbind texture
     glDrawArrays(GL_TRIANGLES, 0, 36); // draw the moon
     
     // remove moon scale/rotation/position, planet position, sun position, and view matrices from stack
@@ -299,6 +350,7 @@ void display(GLFWwindow* window, double currentTime)
     mvStack.push(mvStack.top());
     mvStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(-2.0f, 0.0f, 0.0f));
     mvStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, 1.0f, 1.0f));
+    mvStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0f, 1.0f, 0.0f));
     glUniformMatrix4fv(mvLoc, 1, GL_FALSE, glm::value_ptr(mvStack.top()));
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo[3]);
@@ -324,6 +376,7 @@ void display(GLFWwindow* window, double currentTime)
     mvStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(2.0f, 0.0f, 0.0f));
     mvStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(2.0f, 2.0f, 2.0f));
     mvStack.top() *= glm::rotate(glm::mat4(1.0f), Utils::toRadians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+    mvStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0f, -1.0, 0.0f));
     glUniformMatrix4fv(mvLoc, 1, GL_FALSE, glm::value_ptr(mvStack.top()));
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo[6]);
