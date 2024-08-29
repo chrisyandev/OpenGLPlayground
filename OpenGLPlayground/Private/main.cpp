@@ -29,11 +29,11 @@ Torus myTorus(0.5f, 0.2f, 48);
 ImportedModel myModel("shuttle.obj");
 
 // allocate variables used in display() function, so that they won’t need to be allocated during rendering
-GLuint mvLoc, pLoc;
+GLuint mLoc, vLoc, pLoc;
 int width, height;
 float aspect;
-glm::mat4 pMat, vMat, mMat;
-std::stack<glm::mat4> mvStack;
+glm::mat4 mMat, vMat, pMat;
+std::stack<glm::mat4> trfmStack;
 GLuint brickTexture;
 GLuint earthTexture;
 GLuint shuttleTexture;
@@ -275,22 +275,25 @@ void display(GLFWwindow* window, double currentTime)
     glEnable(GL_LEQUAL); // passes if the incoming depth value is less than or equal to the stored depth value
 
     // reference uniform variables
-    mvLoc = glGetUniformLocation(renderingProgram, "mv_matrix");
+    mLoc = glGetUniformLocation(renderingProgram, "m_matrix");
+    vLoc = glGetUniformLocation(renderingProgram, "v_matrix");
     pLoc = glGetUniformLocation(renderingProgram, "p_matrix");
-    
+
     // copy perspective matrix
     glUniformMatrix4fv(pLoc, 1, GL_FALSE, glm::value_ptr(pMat));
     
-    // push view matrix onto the stack
+    // build and copy view matrix
     vMat = glm::translate(glm::mat4(1.0f), glm::vec3(-cameraX, -cameraY, -cameraZ));
-    mvStack.push(vMat);
+    glUniformMatrix4fv(vLoc, 1, GL_FALSE, glm::value_ptr(vMat));
+
+    trfmStack.push(glm::mat4(1.0f)); // + initial matrix
 
     // ---------------------- pyramid == sun --------------------------------------------
-    mvStack.push(mvStack.top());
-    mvStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)); // sun position
-    mvStack.push(mvStack.top());
-    mvStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(1.0f, 0.0f, 0.0f)); // sun rotation
-    glUniformMatrix4fv(mvLoc, 1, GL_FALSE, glm::value_ptr(mvStack.top()));
+    trfmStack.push(trfmStack.top()); // ++ copy default matrix
+    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)); // sun position
+    trfmStack.push(trfmStack.top()); // +++ push another transform because we want child objects to be relative to the translation above
+    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(1.0f, 0.0f, 0.0f)); // sun rotation
+    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(trfmStack.top()));
     glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(0);
@@ -303,16 +306,16 @@ void display(GLFWwindow* window, double currentTime)
     glBindTexture(GL_TEXTURE_2D, brickTexture);
         // -------------------------
     glDrawArrays(GL_TRIANGLES, 0, 18); // draw the sun
-    mvStack.pop(); // remove the sun’s axial rotation from the stack
+    trfmStack.pop(); // ++ sun's axial rotation removed
     // ----------------------------------------------------------------------------------
 
     // ----------------------- cube == planet -------------------------------------------
-    mvStack.push(mvStack.top());
-    mvStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(sin((float)currentTime) * 4.0, 0.0f, cos((float)currentTime) * 4.0));
-    mvStack.push(mvStack.top());
-    mvStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0, 1.0, 0.0)); // planet rotation
-    mvStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(0.75f, 0.75f, 0.75f));
-    glUniformMatrix4fv(mvLoc, 1, GL_FALSE, glm::value_ptr(mvStack.top()));
+    trfmStack.push(trfmStack.top()); // +++ inherit sun's translation
+    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(sin((float)currentTime) * 4.0, 0.0f, cos((float)currentTime) * 4.0));
+    trfmStack.push(trfmStack.top()); // ++++ push another transform because we want child objects to be relative to the translation above
+    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0, 1.0, 0.0)); // planet rotation
+    trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(0.75f, 0.75f, 0.75f));
+    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(trfmStack.top()));
     glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, cubeStride, 0);
     glEnableVertexAttribArray(0);
@@ -324,34 +327,30 @@ void display(GLFWwindow* window, double currentTime)
     glBindTexture(GL_TEXTURE_2D, brickTexture);
         // -------------------------
     glDrawArrays(GL_TRIANGLES, 0, 36); // draw the planet
-    mvStack.pop(); // remove the planet’s axial rotation from the stack
+    trfmStack.pop(); // +++ planet's rotation axis and scaling removed
 
     // ----------------------- smaller cube == moon -------------------------------------
-    mvStack.push(mvStack.top());
-    mvStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, sin((float)currentTime) * 2.0, cos((float)currentTime) * 2.0));
-    mvStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0, 0.0, 1.0)); // moon rotation
-    mvStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(0.25f, 0.25f, 0.25f)); // make the moon smaller
-    glUniformMatrix4fv(mvLoc, 1, GL_FALSE, glm::value_ptr(mvStack.top()));
+    trfmStack.push(trfmStack.top()); // ++++ inherit planet's translation
+    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, sin((float)currentTime) * 2.0, cos((float)currentTime) * 2.0));
+    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0, 0.0, 1.0)); // moon rotation
+    trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(0.25f, 0.25f, 0.25f)); // make the moon smaller
+    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(trfmStack.top()));
     glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, cubeStride, 0);
     glEnableVertexAttribArray(0);
     glBindTexture(GL_TEXTURE_2D, 0); // unbind texture
     glDrawArrays(GL_TRIANGLES, 0, 36); // draw the moon
     
-    // remove moon scale/rotation/position, planet position, sun position, and view matrices from stack
-    mvStack.pop();
-    mvStack.pop();
-    mvStack.pop();
-    mvStack.pop();
+    trfmStack.pop(); // +++ remove moon's transforms
+    trfmStack.pop(); // ++ remove planet's translation
     // ----------------------------------------------------------------------------------
 
     // ------------------------------ procedural sphere ---------------------------------
-    mvStack.push(vMat);
-    mvStack.push(mvStack.top());
-    mvStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(-2.0f, 0.0f, 0.0f));
-    mvStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, 1.0f, 1.0f));
-    mvStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0f, 1.0f, 0.0f));
-    glUniformMatrix4fv(mvLoc, 1, GL_FALSE, glm::value_ptr(mvStack.top()));
+    trfmStack.push(trfmStack.top()); // +++ inherit sun's translation
+    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(-2.0f, 0.0f, 0.0f));
+    trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, 1.0f, 1.0f));
+    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0f, 1.0f, 0.0f));
+    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(trfmStack.top()));
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo[3]);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
@@ -366,18 +365,16 @@ void display(GLFWwindow* window, double currentTime)
 
     glDrawArrays(GL_TRIANGLES, 0, mySphere.getNumIndices());
 
-    mvStack.pop();
-    mvStack.pop();
+    trfmStack.pop(); // ++ remove procedural sphere's transforms
     // ----------------------------------------------------------------------------------
 
     // ------------------------------ procedural torus ----------------------------------
-    mvStack.push(vMat);
-    mvStack.push(mvStack.top());
-    mvStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(2.0f, 0.0f, 0.0f));
-    mvStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(2.0f, 2.0f, 2.0f));
-    mvStack.top() *= glm::rotate(glm::mat4(1.0f), Utils::toRadians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    mvStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0f, -1.0, 0.0f));
-    glUniformMatrix4fv(mvLoc, 1, GL_FALSE, glm::value_ptr(mvStack.top()));
+    trfmStack.push(trfmStack.top()); // +++ inherit sun's translation
+    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(2.0f, 0.0f, 0.0f));
+    trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(2.0f, 2.0f, 2.0f));
+    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), Utils::toRadians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0f, -1.0, 0.0f));
+    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(trfmStack.top()));
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo[6]);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
@@ -393,16 +390,15 @@ void display(GLFWwindow* window, double currentTime)
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo[9]);
     glDrawElements(GL_TRIANGLES, myTorus.getNumIndices(), GL_UNSIGNED_INT, 0);
 
-    mvStack.pop();
-    mvStack.pop();
+    trfmStack.pop(); // ++ remove procedural torus's transforms
     // ----------------------------------------------------------------------------------
 
     // ------------------------------- imported model -----------------------------------
-    mvStack.push(vMat);
-    mvStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(cos((float)currentTime) * 4.0f, sin((float)currentTime) * 4.0f, cos((float)currentTime) * 4.0f));
-    mvStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(1.0, 1.0, 0.0));
-    mvStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(4.0f, 4.0f, 4.0f));
-    glUniformMatrix4fv(mvLoc, 1, GL_FALSE, glm::value_ptr(mvStack.top()));
+    trfmStack.push(trfmStack.top()); // +++ inherit sun's translation
+    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(cos((float)currentTime) * 4.0f, sin((float)currentTime) * 4.0f, cos((float)currentTime) * 4.0f));
+    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(1.0, 1.0, 0.0));
+    trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(4.0f, 4.0f, 4.0f));
+    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(trfmStack.top()));
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo[10]);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
@@ -417,8 +413,11 @@ void display(GLFWwindow* window, double currentTime)
     
     glDrawArrays(GL_TRIANGLES, 0, myModel.getNumVertices());
 
-    mvStack.pop();
+    trfmStack.pop(); // ++ remove imported model's transforms
     // ----------------------------------------------------------------------------------
+
+    trfmStack.pop(); // + remove sun's translation
+    trfmStack.pop(); // remove initial matrix
 }
 
 void window_reshape_callback(GLFWwindow* window, int newWidth, int newHeight)
