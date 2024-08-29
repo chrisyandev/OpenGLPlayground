@@ -29,14 +29,34 @@ Torus myTorus(0.5f, 0.2f, 48);
 ImportedModel myModel("shuttle.obj");
 
 // allocate variables used in display() function, so that they won’t need to be allocated during rendering
-GLuint mLoc, vLoc, pLoc;
 int width, height;
 float aspect;
-glm::mat4 mMat, vMat, pMat;
+glm::mat4 mMat, vMat, pMat, invTrMat;
+glm::vec3 currLightPos, lightPosV;
+float lightPos[3];
 std::stack<glm::mat4> trfmStack;
 GLuint brickTexture;
 GLuint earthTexture;
 GLuint shuttleTexture;
+
+// shader uniform locations
+GLuint mLoc, vLoc, pLoc, nLoc;
+GLuint globalAmbLoc;
+GLuint lightAmbLoc, lightDifLoc, lightSpeLoc, lightPosLoc;
+GLuint matAmbLoc, matDifLoc, matSpeLoc, matShiLoc;
+
+// light properties
+glm::vec3 initLightPos = glm::vec3(5.0f, 2.0f, 2.0f);
+float globalAmb[4] = { 0.7f, 0.7f, 0.7f, 1.0f };
+float lightAmb[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+float lightDif[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+float lightSpe[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+// gold material properties
+float* matAmb = Utils::goldAmbient();
+float* matDif = Utils::goldDiffuse();
+float* matSpe = Utils::goldSpecular();
+float matShi = Utils::goldShininess();
 
 void setupVertices()
 {
@@ -263,6 +283,36 @@ void init(GLFWwindow* window)
     shuttleTexture = Utils::loadTexture(resourcePath, "spstob_1.jpg");
 }
 
+void installLights()
+{
+    // save the light position in a float array
+    lightPos[0] = currLightPos.x;
+    lightPos[1] = currLightPos.y;
+    lightPos[2] = currLightPos.z;
+
+    // get the locations of the light and material fields in the shader
+    globalAmbLoc = glGetUniformLocation(renderingProgram, "globalAmbient");
+    lightAmbLoc = glGetUniformLocation(renderingProgram, "light.ambient");
+    lightDifLoc = glGetUniformLocation(renderingProgram, "light.diffuse");
+    lightSpeLoc = glGetUniformLocation(renderingProgram, "light.specular");
+    lightPosLoc = glGetUniformLocation(renderingProgram, "light.position");
+    matAmbLoc = glGetUniformLocation(renderingProgram, "material.ambient");
+    matDifLoc = glGetUniformLocation(renderingProgram, "material.diffuse");
+    matSpeLoc = glGetUniformLocation(renderingProgram, "material.specular");
+    matShiLoc = glGetUniformLocation(renderingProgram, "material.shininess");
+
+    // set the uniform light and material values in the shader
+    glProgramUniform4fv(renderingProgram, globalAmbLoc, 1, globalAmb);
+    glProgramUniform4fv(renderingProgram, lightAmbLoc, 1, lightAmb);
+    glProgramUniform4fv(renderingProgram, lightDifLoc, 1, lightDif);
+    glProgramUniform4fv(renderingProgram, lightSpeLoc, 1, lightSpe);
+    glProgramUniform3fv(renderingProgram, lightPosLoc, 1, lightPos);
+    glProgramUniform4fv(renderingProgram, matAmbLoc, 1, matAmb);
+    glProgramUniform4fv(renderingProgram, matDifLoc, 1, matDif);
+    glProgramUniform4fv(renderingProgram, matSpeLoc, 1, matSpe);
+    glProgramUniform1f(renderingProgram, matShiLoc, matShi);
+}
+
 void display(GLFWwindow* window, double currentTime)
 {
     glClear(GL_DEPTH_BUFFER_BIT);
@@ -278,6 +328,7 @@ void display(GLFWwindow* window, double currentTime)
     mLoc = glGetUniformLocation(renderingProgram, "m_matrix");
     vLoc = glGetUniformLocation(renderingProgram, "v_matrix");
     pLoc = glGetUniformLocation(renderingProgram, "p_matrix");
+    nLoc = glGetUniformLocation(renderingProgram, "n_matrix");
 
     // copy perspective matrix
     glUniformMatrix4fv(pLoc, 1, GL_FALSE, glm::value_ptr(pMat));
@@ -285,6 +336,10 @@ void display(GLFWwindow* window, double currentTime)
     // build and copy view matrix
     vMat = glm::translate(glm::mat4(1.0f), glm::vec3(-cameraX, -cameraY, -cameraZ));
     glUniformMatrix4fv(vLoc, 1, GL_FALSE, glm::value_ptr(vMat));
+
+    // set up lights based on the current light's position
+    currLightPos = glm::vec3(initLightPos.x, initLightPos.y, initLightPos.z);
+    installLights();
 
     trfmStack.push(glm::mat4(1.0f)); // + initial matrix
 
@@ -294,6 +349,7 @@ void display(GLFWwindow* window, double currentTime)
     trfmStack.push(trfmStack.top()); // +++ push another transform because we want child objects to be relative to the translation above
     trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(1.0f, 0.0f, 0.0f)); // sun rotation
     glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(trfmStack.top()));
+
     glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(0);
@@ -316,6 +372,7 @@ void display(GLFWwindow* window, double currentTime)
     trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0, 1.0, 0.0)); // planet rotation
     trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(0.75f, 0.75f, 0.75f));
     glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(trfmStack.top()));
+
     glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, cubeStride, 0);
     glEnableVertexAttribArray(0);
@@ -335,6 +392,7 @@ void display(GLFWwindow* window, double currentTime)
     trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0, 0.0, 1.0)); // moon rotation
     trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(0.25f, 0.25f, 0.25f)); // make the moon smaller
     glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(trfmStack.top()));
+
     glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, cubeStride, 0);
     glEnableVertexAttribArray(0);
@@ -350,7 +408,8 @@ void display(GLFWwindow* window, double currentTime)
     trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(-2.0f, 0.0f, 0.0f));
     trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, 1.0f, 1.0f));
     trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0f, 1.0f, 0.0f));
-    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(trfmStack.top()));
+    mMat = trfmStack.top();
+    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(mMat));
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo[3]);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
@@ -362,7 +421,13 @@ void display(GLFWwindow* window, double currentTime)
     glEnableVertexAttribArray(1); // enable vert shader to access tex coords stored in VBO
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, earthTexture);
-
+	    // --- procedural sphere lighting ---
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[5]);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(2);
+    invTrMat = glm::transpose(glm::inverse(mMat));
+    glUniformMatrix4fv(nLoc, 1, GL_FALSE, glm::value_ptr(invTrMat));
+        // ----------------------------------
     glDrawArrays(GL_TRIANGLES, 0, mySphere.getNumIndices());
 
     trfmStack.pop(); // ++ remove procedural sphere's transforms
@@ -374,7 +439,8 @@ void display(GLFWwindow* window, double currentTime)
     trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(2.0f, 2.0f, 2.0f));
     trfmStack.top() *= glm::rotate(glm::mat4(1.0f), Utils::toRadians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
     trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0f, -1.0, 0.0f));
-    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(trfmStack.top()));
+	mMat = trfmStack.top();
+    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(mMat));
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo[6]);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
@@ -386,7 +452,13 @@ void display(GLFWwindow* window, double currentTime)
     glEnableVertexAttribArray(1);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, brickTexture);
-    
+        // --- procedural torus lighting ---
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[8]);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(2);
+    invTrMat = glm::transpose(glm::inverse(mMat));
+    glUniformMatrix4fv(nLoc, 1, GL_FALSE, glm::value_ptr(invTrMat));
+        // ---------------------------------
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo[9]);
     glDrawElements(GL_TRIANGLES, myTorus.getNumIndices(), GL_UNSIGNED_INT, 0);
 
@@ -398,7 +470,8 @@ void display(GLFWwindow* window, double currentTime)
     trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(cos((float)currentTime) * 4.0f, sin((float)currentTime) * 4.0f, cos((float)currentTime) * 4.0f));
     trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(1.0, 1.0, 0.0));
     trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(4.0f, 4.0f, 4.0f));
-    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(trfmStack.top()));
+	mMat = trfmStack.top();
+    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(mMat));
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo[10]);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
@@ -410,7 +483,13 @@ void display(GLFWwindow* window, double currentTime)
     glEnableVertexAttribArray(1);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, shuttleTexture);
-    
+        // --- imported model lighting ---
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[12]);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(2);
+    invTrMat = glm::transpose(glm::inverse(mMat));
+    glUniformMatrix4fv(nLoc, 1, GL_FALSE, glm::value_ptr(invTrMat));
+        // -------------------------------
     glDrawArrays(GL_TRIANGLES, 0, myModel.getNumVertices());
 
     trfmStack.pop(); // ++ remove imported model's transforms
