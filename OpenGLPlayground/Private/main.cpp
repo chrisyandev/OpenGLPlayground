@@ -16,8 +16,8 @@
 constexpr GLuint SCR_WIDTH = 800;
 constexpr GLuint SCR_HEIGHT = 600;
 constexpr GLuint NUM_VAOS = 1;
-constexpr GLuint NUM_VBOS = 13;
-constexpr GLsizei cubeStride = 5 * sizeof(float);
+constexpr GLuint NUM_VBOS = 14;
+constexpr GLsizei cubeStride = 8 * sizeof(float);
 
 std::string resourcePath;
 float cameraX, cameraY, cameraZ;
@@ -46,76 +46,104 @@ GLuint lightAmbLoc, lightDifLoc, lightSpeLoc, lightPosLoc;
 GLuint matAmbLoc, matDifLoc, matSpeLoc, matShiLoc;
 
 // light properties
-glm::vec3 initLightPos = glm::vec3(5.0f, 2.0f, 2.0f);
+glm::vec3 initLightPos = glm::vec3(-5.0f, 2.0f, 4.0f);
 float globalAmb[4] = { 0.7f, 0.7f, 0.7f, 1.0f };
 float lightAmb[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 float lightDif[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 float lightSpe[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 
-// gold material properties
-float* matAmb = Utils::goldAmbient();
-float* matDif = Utils::goldDiffuse();
-float* matSpe = Utils::goldSpecular();
-float matShi = Utils::goldShininess();
+// material properties
+float* matAmb = Utils::silverAmbient();
+float* matDif = Utils::silverDiffuse();
+float* matSpe = Utils::silverSpecular();
+float matShi = Utils::silverShininess();
+
+float* calcPyramidNormals(const float* verts)
+{
+    float pyrNorms[54];
+    for (int i = 0; i < 54; i+=9)
+    {
+        float faceVerts[9];
+        std::copy(verts+i, verts+i+9, faceVerts);
+        float norm[3];
+		Utils::calculateNormal(faceVerts, norm);
+        std::copy(norm, norm+3, pyrNorms+i);
+        std::copy(norm, norm+3, pyrNorms+i+3);
+        std::copy(norm, norm+3, pyrNorms+i+6);
+    }
+    return pyrNorms;
+}
 
 void setupVertices()
 {
     // 36 vertices, 12 triangles, makes 2x2x2 cube placed at origin
-    float cubeVertices[] =
+    float cubeData[] =
     {
-        // Position           // Texture Coords
-        -1.0f,  1.0f, -1.0f,  0.0f, 1.0f, // Front face
-        -1.0f, -1.0f, -1.0f,  0.0f, 0.0f,
-         1.0f, -1.0f, -1.0f,  1.0f, 0.0f,
-         1.0f, -1.0f, -1.0f,  1.0f, 0.0f,
-         1.0f,  1.0f, -1.0f,  1.0f, 1.0f,
-        -1.0f,  1.0f, -1.0f,  0.0f, 1.0f,
+        // Position            // Normals           // Texture Coords
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f, 1.0f,    0.0f, 1.0f, // Front face
+        -1.0f, -1.0f, -1.0f,    0.0f, 0.0f, 1.0f,    0.0f, 0.0f,
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f, 1.0f,    1.0f, 0.0f,
+         1.0f, -1.0f, -1.0f,    0.0f, 0.0f, 1.0f,    1.0f, 0.0f,
+         1.0f,  1.0f, -1.0f,    0.0f, 0.0f, 1.0f,    1.0f, 1.0f,
+        -1.0f,  1.0f, -1.0f,    0.0f, 0.0f, 1.0f,    0.0f, 1.0f,
+                                                    
+         1.0f, -1.0f, -1.0f,    1.0f, 0.0f, 0.0f,    0.0f, 0.0f, // Right face
+         1.0f, -1.0f,  1.0f,    1.0f, 0.0f, 0.0f,    1.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    1.0f, 0.0f, 0.0f,    1.0f, 1.0f,
+         1.0f,  1.0f,  1.0f,    1.0f, 0.0f, 0.0f,    1.0f, 1.0f,
+         1.0f,  1.0f, -1.0f,    1.0f, 0.0f, 0.0f,    0.0f, 1.0f,
+         1.0f, -1.0f, -1.0f,    1.0f, 0.0f, 0.0f,    0.0f, 0.0f,
+                               
+         1.0f, -1.0f,  1.0f,    0.0f, 0.0f, -1.0f,   1.0f, 0.0f, // Back face
+        -1.0f, -1.0f,  1.0f,    0.0f, 0.0f, -1.0f,   0.0f, 0.0f,
+        -1.0f,  1.0f,  1.0f,    0.0f, 0.0f, -1.0f,   0.0f, 1.0f,
+        -1.0f,  1.0f,  1.0f,    0.0f, 0.0f, -1.0f,   0.0f, 1.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 0.0f, -1.0f,   1.0f, 1.0f,
+         1.0f, -1.0f,  1.0f,    0.0f, 0.0f, -1.0f,   1.0f, 0.0f,
+                               
+        -1.0f, -1.0f,  1.0f,   -1.0f, 0.0f, 0.0f,    1.0f, 0.0f, // Left face
+        -1.0f, -1.0f, -1.0f,   -1.0f, 0.0f, 0.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f, -1.0f,   -1.0f, 0.0f, 0.0f,    0.0f, 1.0f,
+        -1.0f,  1.0f, -1.0f,   -1.0f, 0.0f, 0.0f,    0.0f, 1.0f,
+        -1.0f,  1.0f,  1.0f,   -1.0f, 0.0f, 0.0f,    1.0f, 1.0f,
+        -1.0f, -1.0f,  1.0f,   -1.0f, 0.0f, 0.0f,    1.0f, 0.0f,
 
-         1.0f, -1.0f, -1.0f,  0.0f, 0.0f, // Right face
-         1.0f, -1.0f,  1.0f,  1.0f, 0.0f,
-         1.0f,  1.0f,  1.0f,  1.0f, 1.0f,
-         1.0f,  1.0f,  1.0f,  1.0f, 1.0f,
-         1.0f,  1.0f, -1.0f,  0.0f, 1.0f,
-         1.0f, -1.0f, -1.0f,  0.0f, 0.0f,
+        -1.0f,  1.0f, -1.0f,    0.0f, 1.0f, 0.0f,    0.0f, 1.0f, // Top face
+         1.0f,  1.0f, -1.0f,    0.0f, 1.0f, 0.0f,    1.0f, 1.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 1.0f, 0.0f,    1.0f, 0.0f,
+         1.0f,  1.0f,  1.0f,    0.0f, 1.0f, 0.0f,    1.0f, 0.0f,
+        -1.0f,  1.0f,  1.0f,    0.0f, 1.0f, 0.0f,    0.0f, 0.0f,
+        -1.0f,  1.0f, -1.0f,    0.0f, 1.0f, 0.0f,    0.0f, 1.0f,
 
-         1.0f, -1.0f,  1.0f,  1.0f, 0.0f, // Back face
-        -1.0f, -1.0f,  1.0f,  0.0f, 0.0f,
-        -1.0f,  1.0f,  1.0f,  0.0f, 1.0f,
-        -1.0f,  1.0f,  1.0f,  0.0f, 1.0f,
-         1.0f,  1.0f,  1.0f,  1.0f, 1.0f,
-         1.0f, -1.0f,  1.0f,  1.0f, 0.0f,
-
-        -1.0f, -1.0f,  1.0f,  1.0f, 0.0f, // Left face
-        -1.0f, -1.0f, -1.0f,  0.0f, 0.0f,
-        -1.0f,  1.0f, -1.0f,  0.0f, 1.0f,
-        -1.0f,  1.0f, -1.0f,  0.0f, 1.0f,
-        -1.0f,  1.0f,  1.0f,  1.0f, 1.0f,
-        -1.0f, -1.0f,  1.0f,  1.0f, 0.0f,
-
-        -1.0f,  1.0f, -1.0f,  0.0f, 1.0f, // Top face
-         1.0f,  1.0f, -1.0f,  1.0f, 1.0f,
-         1.0f,  1.0f,  1.0f,  1.0f, 0.0f,
-         1.0f,  1.0f,  1.0f,  1.0f, 0.0f,
-        -1.0f,  1.0f,  1.0f,  0.0f, 0.0f,
-        -1.0f,  1.0f, -1.0f,  0.0f, 1.0f,
-
-        -1.0f, -1.0f, -1.0f,  1.0f, 0.0f, // Bottom face
-         1.0f, -1.0f, -1.0f,  0.0f, 0.0f,
-         1.0f, -1.0f,  1.0f,  0.0f, 1.0f,
-         1.0f, -1.0f,  1.0f,  0.0f, 1.0f,
-        -1.0f, -1.0f,  1.0f,  1.0f, 1.0f,
-        -1.0f, -1.0f, -1.0f,  1.0f, 0.0f
+        -1.0f, -1.0f, -1.0f,    0.0f, -1.0f, 0.0f,   1.0f, 0.0f, // Bottom face
+         1.0f, -1.0f, -1.0f,    0.0f, -1.0f, 0.0f,   0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f,    0.0f, -1.0f, 0.0f,   0.0f, 1.0f,
+         1.0f, -1.0f,  1.0f,    0.0f, -1.0f, 0.0f,   0.0f, 1.0f,
+        -1.0f, -1.0f,  1.0f,    0.0f, -1.0f, 0.0f,   1.0f, 1.0f,
+        -1.0f, -1.0f, -1.0f,    0.0f, -1.0f, 0.0f,   1.0f, 0.0f
     };
 
     // pyramid with 18 vertices, comprising 6 triangles (four sides, and two on the bottom)
-    float pyramidPositions[54] =
+    float pyrVerts[54] =
     {
-        -1.0f, -1.0f, 1.0f, 1.0f, -1.0f, 1.0f, 0.0f, 1.0f, 0.0f,    // front face
-         1.0f, -1.0f, 1.0f, 1.0f, -1.0f, -1.0f, 0.0f, 1.0f, 0.0f,   // right face
-         1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, 0.0f, 1.0f, 0.0f, // back face
-        -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, 1.0f, 0.0f, 1.0f, 0.0f,  // left face
-        -1.0f, -1.0f, -1.0f, 1.0f, -1.0f, 1.0f, -1.0f, -1.0f, 1.0f, // base left front
-         1.0f, -1.0f, 1.0f, -1.0f, -1.0f, -1.0f, 1.0f, -1.0f, -1.0f // base right back
+        -1.0f, -1.0f, 1.0f,  // front face
+         1.0f, -1.0f, 1.0f,
+         0.0f, 1.0f, 0.0f,
+         1.0f, -1.0f, 1.0f,  // right face
+         1.0f, -1.0f, -1.0f,
+         0.0f, 1.0f, 0.0f,
+         1.0f, -1.0f, -1.0f, // back face
+        -1.0f, -1.0f, -1.0f,
+         0.0f, 1.0f, 0.0f,
+        -1.0f, -1.0f, -1.0f, // left face
+        -1.0f, -1.0f, 1.0f,
+         0.0f, 1.0f, 0.0f,
+        -1.0f, -1.0f, -1.0f, // base left front
+         1.0f, -1.0f, 1.0f,
+        -1.0f, -1.0f, 1.0f,
+         1.0f, -1.0f, 1.0f,  // base right back
+        -1.0f, -1.0f, -1.0f,
+         1.0f, -1.0f, -1.0f
     };
 
     float pyrTexCoords[36] =
@@ -140,19 +168,26 @@ void setupVertices()
          1.0f, 0.0f
     };
 
+    float pyrNorms[54];
+    float* pyrNormsPtr = calcPyramidNormals(pyrVerts);
+    std::copy(pyrNormsPtr, pyrNormsPtr+54, pyrNorms);
+
     glGenVertexArrays(NUM_VAOS, vao);
     glBindVertexArray(*vao);
 
     glGenBuffers(NUM_VBOS, vbo);
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeData), cubeData, GL_STATIC_DRAW);
     
     glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(pyramidPositions), pyramidPositions, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(pyrVerts), pyrVerts, GL_STATIC_DRAW);
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo[2]);
     glBufferData(GL_ARRAY_BUFFER, sizeof(pyrTexCoords), pyrTexCoords, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[13]);
+    glBufferData(GL_ARRAY_BUFFER, 54 * sizeof(float), pyrNorms, GL_STATIC_DRAW);
 
     // ------------------------------ procedural sphere -------------------------------
     std::vector<int> sphIdxs = mySphere.getIndices();
@@ -348,7 +383,8 @@ void display(GLFWwindow* window, double currentTime)
     trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)); // sun position
     trfmStack.push(trfmStack.top()); // +++ push another transform because we want child objects to be relative to the translation above
     trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(1.0f, 0.0f, 0.0f)); // sun rotation
-    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(trfmStack.top()));
+    mMat = trfmStack.top();
+    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(mMat));
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
@@ -361,6 +397,13 @@ void display(GLFWwindow* window, double currentTime)
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, brickTexture);
         // -------------------------
+        // --- pyramid lighting ---
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[13]);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
+	glEnableVertexAttribArray(2);
+    invTrMat = glm::transpose(glm::inverse(mMat));
+    glUniformMatrix4fv(nLoc, 1, GL_FALSE, glm::value_ptr(invTrMat));
+        // ------------------------
     glDrawArrays(GL_TRIANGLES, 0, 18); // draw the sun
     trfmStack.pop(); // ++ sun's axial rotation removed
     // ----------------------------------------------------------------------------------
@@ -371,18 +414,25 @@ void display(GLFWwindow* window, double currentTime)
     trfmStack.push(trfmStack.top()); // ++++ push another transform because we want child objects to be relative to the translation above
     trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0, 1.0, 0.0)); // planet rotation
     trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(0.75f, 0.75f, 0.75f));
-    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(trfmStack.top()));
+    mMat = trfmStack.top();
+    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(mMat));
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, cubeStride, 0);
     glEnableVertexAttribArray(0);
     glFrontFace(GL_CW); // the cube vertices have clockwise winding order
         // --- cube texturing ---
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, cubeStride, (void*)(3 * sizeof(float)));
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, cubeStride, (void*)(6 * sizeof(float)));
     glEnableVertexAttribArray(1);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, brickTexture);
-        // -------------------------
+        // ----------------------
+		// --- cube lighting ---
+	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, cubeStride, (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    invTrMat = glm::transpose(glm::inverse(mMat));
+    glUniformMatrix4fv(nLoc, 1, GL_FALSE, glm::value_ptr(invTrMat));
+        // ---------------------
     glDrawArrays(GL_TRIANGLES, 0, 36); // draw the planet
     trfmStack.pop(); // +++ planet's rotation axis and scaling removed
 
@@ -391,7 +441,12 @@ void display(GLFWwindow* window, double currentTime)
     trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, sin((float)currentTime) * 2.0, cos((float)currentTime) * 2.0));
     trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0, 0.0, 1.0)); // moon rotation
     trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(0.25f, 0.25f, 0.25f)); // make the moon smaller
-    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(trfmStack.top()));
+	mMat = trfmStack.top();
+    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(mMat));
+
+    // recalculate inverse-transpose of M matrix
+    invTrMat = glm::transpose(glm::inverse(mMat));
+    glUniformMatrix4fv(nLoc, 1, GL_FALSE, glm::value_ptr(invTrMat));
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, cubeStride, 0);

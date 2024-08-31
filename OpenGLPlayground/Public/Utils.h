@@ -14,6 +14,7 @@ public:
     static GLuint createShaderProgram(const char* vp, const char* fp);
     static GLuint loadTexture(const std::string& directoryPath, const std::string& texImageName);
     static float toRadians(float degrees);
+    static void calculateNormal(const float* verts, float* outNormal);
 
     // GOLD material - ambient, diffuse, specular, and shininess
     static float* goldAmbient() { static float a[4] = { 0.2473f, 0.1995f, 0.0745f, 1 }; return (float*)a; }

@@ -1,6 +1,8 @@
 #include "Utils.h"
 #include <SOIL2/SOIL2.h>
 #include <filesystem>
+#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 std::string Utils::getCurrentPath()
 {
@@ -104,4 +106,17 @@ GLuint Utils::loadTexture(const std::string& directoryPath, const std::string& t
 float Utils::toRadians(float degrees)
 {
     return (degrees * 2.0f * 3.14159f) / 360.0f;
+}
+
+void Utils::calculateNormal(const float* verts, float* outNormal)
+{
+    glm::vec3 A(verts[0], verts[1], verts[2]);
+    glm::vec3 B(verts[3], verts[4], verts[5]);
+    glm::vec3 C(verts[6], verts[7], verts[8]);
+    glm::vec3 AB = glm::normalize(B - A);
+    glm::vec3 AC = glm::normalize(C - A);
+    glm::vec3 normal = glm::cross(AB, AC);
+    outNormal[0] = normal.x;
+	outNormal[1] = normal.y;
+	outNormal[2] = normal.z;
 }
