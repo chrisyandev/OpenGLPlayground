@@ -34,6 +34,7 @@ out vec2 texCoord;          // texture coordinate
 out vec3 varyingNormal;     // world-space vertex normal
 out vec3 varyingLightDir;   // vector pointing to the light
 out vec3 varyingVertPos;    // vertex position in world space
+out vec3 varyingHalfVector; // vector between L and V
 
 void main(void)
 {
@@ -42,6 +43,7 @@ void main(void)
     varyingVertPos = (m_matrix * vec4(aPos, 1.0)).xyz;
     varyingLightDir = light.position - varyingVertPos;
     varyingNormal = (n_matrix * vec4(aNorm, 1.0)).xyz;
+    varyingHalfVector = (varyingLightDir + (-varyingVertPos)).xyz;
 
     gl_Position = p_matrix * v_matrix * m_matrix * vec4(aPos, 1.0);
 }

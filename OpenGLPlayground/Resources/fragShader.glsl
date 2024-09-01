@@ -4,6 +4,7 @@ in vec2 texCoord;
 in vec3 varyingNormal;
 in vec3 varyingLightDir;
 in vec3 varyingVertPos;
+in vec3 varyingHalfVector;
 
 layout (binding=0) uniform sampler2D samp; // (binding=0) means texture unit 0
 
@@ -39,15 +40,13 @@ void main(void)
     vec3 L = normalize(varyingLightDir);
     vec3 N = normalize(varyingNormal);
     vec3 V = normalize(-v_matrix[3].xyz - varyingVertPos);
-    
-    // compute light reflection vector with respect to N:
-    vec3 R = normalize(reflect(-L, N));
+    vec3 H = normalize(varyingHalfVector);
     
     // get the angle between the light and surface normal:
     float cosTheta = dot(L, N);
     
-    // angle between the view vector and reflected light:
-    float cosPhi = dot(V, R);
+    // angle between the normal and halfway vector
+    float cosPhi = dot(H, N);
     
     // compute ADS contributions (per pixel), and combine to build output color:
     vec3 ambient = ((globalAmbient * material.ambient) + (light.ambient * material.ambient)).xyz;
