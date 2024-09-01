@@ -30,25 +30,18 @@ uniform vec4 globalAmbient;
 uniform PositionalLight light;
 uniform Material material;
 
-out vec2 texCoord; // texture coordinate output to rasterizer for interpolation
-out vec4 varyingColor;
+out vec2 texCoord;          // texture coordinate
+out vec3 varyingNormal;     // world-space vertex normal
+out vec3 varyingLightDir;   // vector pointing to the light
+out vec3 varyingVertPos;    // vertex position in world space
 
 void main(void)
 {
-    vec4 color;
-
-    vec4 P = m_matrix * vec4(aPos, 1.0);                        // convert vertex position to world space
-    vec3 N = normalize((n_matrix * vec4(aNorm,1.0)).xyz);       // convert normal to world space
-    vec3 L = normalize(light.position - P.xyz);                 // calculate world space light vector (from vertex to light)
-    vec3 V = normalize(-v_matrix[3].xyz - P.xyz);               // view vector is from vertex to cam, cam position is extracted from view matrix
-    vec3 R = reflect(-L, N);                                    // R is reflection of -L with respect to surface normal N
-
-    // ambient, diffuse, and specular contributions
-    vec3 ambient = ((globalAmbient * material.ambient) + (light.ambient * material.ambient)).xyz;
-    vec3 diffuse = light.diffuse.xyz * material.diffuse.xyz * max(dot(N,L), 0.0);
-    vec3 specular = material.specular.xyz * light.specular.xyz * pow(max(dot(R,V), 0.0f), material.shininess);
+    // output texture coordinate, vertex position, light direction, and normal to the rasterizer for interpolation
+    texCoord = aTexCoord;
+    varyingVertPos = (m_matrix * vec4(aPos, 1.0)).xyz;
+    varyingLightDir = light.position - varyingVertPos;
+    varyingNormal = (n_matrix * vec4(aNorm, 1.0)).xyz;
 
     gl_Position = p_matrix * v_matrix * m_matrix * vec4(aPos, 1.0);
-    texCoord = aTexCoord;
-    varyingColor = vec4((ambient + diffuse + specular), 1.0);
 }

@@ -1,7 +1,9 @@
 #version 430
 
 in vec2 texCoord;
-in vec4 varyingColor;
+in vec3 varyingNormal;
+in vec3 varyingLightDir;
+in vec3 varyingVertPos;
 
 layout (binding=0) uniform sampler2D samp; // (binding=0) means texture unit 0
 
@@ -33,11 +35,34 @@ out vec4 color;
 
 void main(void)
 {
-    vec4 texColor = texture(samp, texCoord);
-    color = texColor * varyingColor;
+    // normalize the light, normal, and view vectors:
+    vec3 L = normalize(varyingLightDir);
+    vec3 N = normalize(varyingNormal);
+    vec3 V = normalize(-v_matrix[3].xyz - varyingVertPos);
+    
+    // compute light reflection vector with respect to N:
+    vec3 R = normalize(reflect(-L, N));
+    
+    // get the angle between the light and surface normal:
+    float cosTheta = dot(L, N);
+    
+    // angle between the view vector and reflected light:
+    float cosPhi = dot(V, R);
+    
+    // compute ADS contributions (per pixel), and combine to build output color:
+    vec3 ambient = ((globalAmbient * material.ambient) + (light.ambient * material.ambient)).xyz;
+    vec3 diffuse = light.diffuse.xyz * material.diffuse.xyz * max(cosTheta, 0.0);
+    vec3 specular = light.specular.xyz * material.specular.xyz * pow(max(cosPhi, 0.0), material.shininess);
 
-    if (color == vec4(0.0, 0.0, 0.0, 1.0)) // if no texture
+    vec4 texColor = texture(samp, texCoord);
+    vec4 adsColor = vec4((ambient + diffuse + specular), 1.0);
+
+    if (texColor == vec4(0.0, 0.0, 0.0, 1.0)) // if no texture
     {
-        color = varyingColor;
+        color = adsColor;
+    }
+    else
+    {
+        color = texColor * adsColor;
     }
 }
