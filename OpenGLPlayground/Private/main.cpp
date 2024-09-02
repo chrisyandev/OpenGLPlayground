@@ -16,7 +16,7 @@
 constexpr GLuint SCR_WIDTH = 800;
 constexpr GLuint SCR_HEIGHT = 600;
 constexpr GLuint NUM_VAOS = 1;
-constexpr GLuint NUM_VBOS = 14;
+constexpr GLuint NUM_VBOS = 17;
 constexpr GLsizei cubeStride = 8 * sizeof(float);
 
 std::string resourcePath;
@@ -26,7 +26,8 @@ GLuint vao[NUM_VAOS];
 GLuint vbo[NUM_VBOS];
 Sphere mySphere(48);
 Torus myTorus(0.5f, 0.2f, 48);
-ImportedModel myModel("shuttle.obj");
+ImportedModel myShuttle("shuttle.obj");
+ImportedModel myDolphin("dolphinHighPoly.obj");
 
 // allocate variables used in display() function, so that they won’t need to be allocated during rendering
 int width, height;
@@ -264,37 +265,69 @@ void setupVertices()
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, torIdxs.size() * 4, &torIdxs[0], GL_STATIC_DRAW);
     // ----------------------------------------------------------------------------------
 
-    // ------------------------------- imported model -----------------------------------
-    std::vector<glm::vec3> modVerts = myModel.getVertices();
-    std::vector<glm::vec2> modTexs = myModel.getTextureCoords();
-    std::vector<glm::vec3> modNorms = myModel.getNormals();
-    std::vector<float> modPosVals; // vertex positions
-    std::vector<float> modTexVals; // texture coordinates
-    std::vector<float> modNormVals; // normal vectors
+    // ------------------------------- imported shuttle -----------------------------------
+    std::vector<glm::vec3> shuVerts = myShuttle.getVertices();
+    std::vector<glm::vec2> shuTexs = myShuttle.getTextureCoords();
+    std::vector<glm::vec3> shuNorms = myShuttle.getNormals();
+    std::vector<float> shuPosVals; // vertex positions
+    std::vector<float> shuTexVals; // texture coordinates
+    std::vector<float> shuNormVals; // normal vectors
 
-    int modNumVertices = myModel.getNumVertices();
-    for (int i = 0; i < modNumVertices; i++)
+    int shuNumVertices = myShuttle.getNumVertices();
+    for (int i = 0; i < shuNumVertices; i++)
     {
-        modPosVals.push_back(modVerts[i].x);
-        modPosVals.push_back(modVerts[i].y);
-        modPosVals.push_back(modVerts[i].z);
-        modTexVals.push_back(modTexs[i].s);
-        modTexVals.push_back(modTexs[i].t);
-        modNormVals.push_back(modNorms[i].x);
-        modNormVals.push_back(modNorms[i].y);
-        modNormVals.push_back(modNorms[i].z);
+        shuPosVals.push_back(shuVerts[i].x);
+        shuPosVals.push_back(shuVerts[i].y);
+        shuPosVals.push_back(shuVerts[i].z);
+        shuTexVals.push_back(shuTexs[i].s);
+        shuTexVals.push_back(shuTexs[i].t);
+        shuNormVals.push_back(shuNorms[i].x);
+        shuNormVals.push_back(shuNorms[i].y);
+        shuNormVals.push_back(shuNorms[i].z);
     }
 
     // put the vertices into buffer #11
     glBindBuffer(GL_ARRAY_BUFFER, vbo[10]);
-    glBufferData(GL_ARRAY_BUFFER, modPosVals.size() * 4, &modPosVals[0], GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, shuPosVals.size() * 4, &shuPosVals[0], GL_STATIC_DRAW);
     // put the texture coordinates into buffer #12
     glBindBuffer(GL_ARRAY_BUFFER, vbo[11]);
-    glBufferData(GL_ARRAY_BUFFER, modTexVals.size() * 4, &modTexVals[0], GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, shuTexVals.size() * 4, &shuTexVals[0], GL_STATIC_DRAW);
     // put the normals into buffer #13
     glBindBuffer(GL_ARRAY_BUFFER, vbo[12]);
-    glBufferData(GL_ARRAY_BUFFER, modNormVals.size() * 4, &modNormVals[0], GL_STATIC_DRAW);
-    // ----------------------------------------------------------------------------------
+    glBufferData(GL_ARRAY_BUFFER, shuNormVals.size() * 4, &shuNormVals[0], GL_STATIC_DRAW);
+    // ------------------------------------------------------------------------------------
+
+        // ------------------------------- imported dolphin -----------------------------------
+    std::vector<glm::vec3> dolVerts = myDolphin.getVertices();
+    std::vector<glm::vec2> dolTexs = myDolphin.getTextureCoords();
+    std::vector<glm::vec3> dolNorms = myDolphin.getNormals();
+    std::vector<float> dolPosVals; // vertex positions
+    std::vector<float> dolTexVals; // texture coordinates
+    std::vector<float> dolNormVals; // normal vectors
+
+    int dolNumVertices = myDolphin.getNumVertices();
+    for (int i = 0; i < dolNumVertices; i++)
+    {
+        dolPosVals.push_back(dolVerts[i].x);
+        dolPosVals.push_back(dolVerts[i].y);
+        dolPosVals.push_back(dolVerts[i].z);
+        dolTexVals.push_back(dolTexs[i].s);
+        dolTexVals.push_back(dolTexs[i].t);
+        dolNormVals.push_back(dolNorms[i].x);
+        dolNormVals.push_back(dolNorms[i].y);
+        dolNormVals.push_back(dolNorms[i].z);
+    }
+
+    // put the vertices into buffer #11
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[14]);
+    glBufferData(GL_ARRAY_BUFFER, dolPosVals.size() * 4, &dolPosVals[0], GL_STATIC_DRAW);
+    // put the texture coordinates into buffer #12
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[15]);
+    glBufferData(GL_ARRAY_BUFFER, dolTexVals.size() * 4, &dolTexVals[0], GL_STATIC_DRAW);
+    // put the normals into buffer #13
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[16]);
+    glBufferData(GL_ARRAY_BUFFER, dolNormVals.size() * 4, &dolNormVals[0], GL_STATIC_DRAW);
+    // ----------------------------------------------------------------------------------------
 }
 
 void init(GLFWwindow* window)
@@ -454,7 +487,7 @@ void display(GLFWwindow* window, double currentTime)
     glBindTexture(GL_TEXTURE_2D, 0); // unbind texture
     glDrawArrays(GL_TRIANGLES, 0, 36); // draw the moon
     
-    trfmStack.pop(); // +++ remove moon's transforms
+    trfmStack.pop(); // +++ remove moon's transformations
     trfmStack.pop(); // ++ remove planet's translation
     // ----------------------------------------------------------------------------------
 
@@ -485,7 +518,7 @@ void display(GLFWwindow* window, double currentTime)
         // ----------------------------------
     glDrawArrays(GL_TRIANGLES, 0, mySphere.getNumIndices());
 
-    trfmStack.pop(); // ++ remove procedural sphere's transforms
+    trfmStack.pop(); // ++ remove procedural sphere's transformations
     // ----------------------------------------------------------------------------------
 
     // ------------------------------ procedural torus ----------------------------------
@@ -517,10 +550,10 @@ void display(GLFWwindow* window, double currentTime)
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo[9]);
     glDrawElements(GL_TRIANGLES, myTorus.getNumIndices(), GL_UNSIGNED_INT, 0);
 
-    trfmStack.pop(); // ++ remove procedural torus's transforms
+    trfmStack.pop(); // ++ remove procedural torus's transformations
     // ----------------------------------------------------------------------------------
 
-    // ------------------------------- imported model -----------------------------------
+    // ------------------------------- imported shuttle -----------------------------------
     trfmStack.push(trfmStack.top()); // +++ inherit sun's translation
     trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(cos((float)currentTime) * 4.0f, sin((float)currentTime) * 4.0f, cos((float)currentTime) * 4.0f));
     trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(1.0, 1.0, 0.0));
@@ -532,23 +565,51 @@ void display(GLFWwindow* window, double currentTime)
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(0);
     glFrontFace(GL_CCW);
-
+        // --- shuttle texturing ---
     glBindBuffer(GL_ARRAY_BUFFER, vbo[11]);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(1);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, shuttleTexture);
-        // --- imported model lighting ---
+        // ------------------------
+        // --- shuttle lighting ---
     glBindBuffer(GL_ARRAY_BUFFER, vbo[12]);
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(2);
     invTrMat = glm::transpose(glm::inverse(mMat));
     glUniformMatrix4fv(nLoc, 1, GL_FALSE, glm::value_ptr(invTrMat));
-        // -------------------------------
-    glDrawArrays(GL_TRIANGLES, 0, myModel.getNumVertices());
+        // ------------------------
+    glDrawArrays(GL_TRIANGLES, 0, myShuttle.getNumVertices());
 
-    trfmStack.pop(); // ++ remove imported model's transforms
-    // ----------------------------------------------------------------------------------
+    trfmStack.pop(); // ++ remove shuttle's transformations
+    // ------------------------------------------------------------------------------------
+
+    // ------------------------------- imported dolphin -----------------------------------
+    trfmStack.push(trfmStack.top()); // +++ inherit sun's translation
+    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(cos((float)currentTime) * 4.0f, -sin((float)currentTime) * 4.0f, -cos((float)currentTime) * 4.0f));
+    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), -(float)currentTime, glm::vec3(1.0, 1.0, 0.0));
+    trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(4.0f, 4.0f, 4.0f));
+    mMat = trfmStack.top();
+    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(mMat));
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[14]);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(0);
+    glFrontFace(GL_CCW);
+    // --- dolphin texturing ---
+    glBindTexture(GL_TEXTURE_2D, 0);
+    // ------------------------
+    // --- dolphin lighting ---
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[16]);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(2);
+    invTrMat = glm::transpose(glm::inverse(mMat));
+    glUniformMatrix4fv(nLoc, 1, GL_FALSE, glm::value_ptr(invTrMat));
+    // ------------------------
+    glDrawArrays(GL_TRIANGLES, 0, myDolphin.getNumVertices());
+
+    trfmStack.pop(); // ++ remove dolphin's transformations
+    // ------------------------------------------------------------------------------------
 
     trfmStack.pop(); // + remove sun's translation
     trfmStack.pop(); // remove initial matrix

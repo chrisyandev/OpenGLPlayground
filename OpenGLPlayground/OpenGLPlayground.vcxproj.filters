@@ -56,12 +56,4 @@
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
-  <ItemGroup>
-    <Image Include="Resources\brick1.jpg">
-      <Filter>Resource Files</Filter>
-    </Image>
-    <Image Include="Resources\earthmap1k.jpg">
-      <Filter>Resource Files</Filter>
-    </Image>
-  </ItemGroup>
 </Project>
