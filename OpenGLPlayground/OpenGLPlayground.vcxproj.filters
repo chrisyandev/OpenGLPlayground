@@ -35,10 +35,16 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Resources\vertShader.glsl">
+    <None Include="Resources\vert2Shader.glsl">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="Resources\fragShader.glsl">
+    <None Include="Resources\frag2Shader.glsl">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="Resources\vert1Shader.glsl">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="Resources\frag1Shader.glsl">
       <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>

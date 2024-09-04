@@ -27,8 +27,10 @@
     <ClCompile Include="Private\Utils.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Resources\fragShader.glsl" />
-    <None Include="Resources\vertShader.glsl" />
+    <None Include="Resources\frag1Shader.glsl" />
+    <None Include="Resources\frag2Shader.glsl" />
+    <None Include="Resources\vert1Shader.glsl" />
+    <None Include="Resources\vert2Shader.glsl" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Public\ImportedModel.h" />
