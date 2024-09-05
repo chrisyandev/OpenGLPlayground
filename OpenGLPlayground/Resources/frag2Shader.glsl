@@ -37,30 +37,56 @@ uniform mat4 shadowMVP;
 
 out vec4 color;
 
+float lookup(float ox, float oy)
+{
+    float t = textureProj(shadowSamp,
+        shadow_coord +
+            vec4(ox * 0.001 * shadow_coord.w, oy * 0.001 * shadow_coord.w, -0.01, 0.0));
+            // the third parameter (-0.01) is an offset to counteract shadow acne
+    return t; // 0.0 = entirely in shadow, 1.0 = entirely not in shadow
+}
+
 void main()
 {
+    float shadowFactor = 0.0;
+
     // normalize the light, normal, and view vectors:
     vec3 L = normalize(varyingLightDir);
     vec3 N = normalize(varyingNorm);
     vec3 V = normalize(-v_matrix[3].xyz - varyingVertPos);
     vec3 H = normalize(varyingHalfVec);
+
+    // --- 4-sample dithered soft shadow ---
+    // float swidth = 2.5; // tunable amount of shadow spread
+    // vec2 offset = mod(floor(gl_FragCoord.xy), 2.0) * swidth; // produces one of 4 sample patterns depending on gl_FragCoord%2
+    // shadowFactor += lookup(-1.5 * swidth + offset.x, 1.5 * swidth - offset.y);
+    // shadowFactor += lookup(-1.5 * swidth + offset.x, -0.5 * swidth - offset.y);
+    // shadowFactor += lookup(0.5 * swidth + offset.x, 1.5 * swidth - offset.y);
+    // shadowFactor += lookup(0.5 * swidth + offset.x, -0.5 * swidth - offset.y);
+    // shadowFactor = shadowFactor / 4.0; // shadowFactor is an average of the four sampled points
+    // -------------------------------------
+
+    // --- 64-sample high resolution soft shadow ---
+    float swidth = 2.5; // tunable amount of shadow spread
+    float endp = swidth * 3.0 + swidth / 2.0;
+    for (float m = -endp; m <= endp; m = m + swidth)
+    {
+       for (float n = -endp; n <= endp; n = n + swidth)
+       {
+           shadowFactor += lookup(m,n);
+       }
+    }
+    shadowFactor = shadowFactor / 64.0;
+    // ---------------------------------------------
     
     float cosTheta = dot(L, N); // angle between the light and surface normal
     float cosPhi = dot(H, N); // angle between the surface normal and halfway vector
 
-    vec3 ambient = ((globalAmb * material.ambient) + (light.ambient * material.ambient)).xyz;
-    
-    float shadowLookup = textureProj(shadowSamp, shadow_coord); // 0 = in shadow, 1 = not in shadow
-    if (shadowLookup == 0.0)
-    {
-        color = vec4(ambient, 1.0);
-    }
-    else
-    {
-        vec3 diffuse = light.diffuse.xyz * material.diffuse.xyz * max(cosTheta, 0.0);
-        vec3 specular = light.specular.xyz * material.specular.xyz * pow(max(cosPhi, 0.0), material.shininess);
-        color = vec4((ambient + diffuse + specular), 1.0);
-    }
+    vec3 ambient = (globalAmb * material.ambient + light.ambient * material.ambient).xyz;
+    vec3 diffuse = light.diffuse.xyz * material.diffuse.xyz * max(cosTheta, 0.0);
+    vec3 specular = light.specular.xyz * material.specular.xyz * pow(max(cosPhi, 0.0), material.shininess);
+
+    color = vec4(ambient + (shadowFactor * (diffuse + specular)), 1.0);
 
     vec4 texColor = texture(texSamp, texCoord);
     if (texColor != vec4(0.0, 0.0, 0.0, 1.0)) // if there is a texture
