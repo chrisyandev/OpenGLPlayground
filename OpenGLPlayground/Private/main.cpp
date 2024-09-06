@@ -42,12 +42,12 @@ GLuint shuttleTexture;
 
 // shader uniform locations
 GLuint mLoc, vLoc, pLoc, nLoc, shLoc;
-GLuint globalAmbLoc;
 GLuint lightAmbLoc, lightDifLoc, lightSpeLoc, lightPosLoc;
 GLuint matAmbLoc, matDifLoc, matSpeLoc, matShiLoc;
+GLuint globalAmbLoc, winSizeLoc;
 
 // light properties
-glm::vec3 initLightPos(-5.0f, 2.0f, 4.0f);
+glm::vec3 initLightPos(-5.0f, 3.0f, 4.0f);
 float globalAmb[4] = { 0.7f, 0.7f, 0.7f, 1.0f };
 float lightAmb[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 float lightDif[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -67,20 +67,18 @@ glm::mat4 lightPmatrix;
 glm::mat4 shadowMVP;
 glm::mat4 b;
 
-float* calcPyramidNormals(const float* verts)
+void calcPyramidNormals(const float* verts, float* outNormals)
 {
-    float pyrNorms[54];
     for (int i = 0; i < 54; i+=9)
     {
         float faceVerts[9];
         std::copy(verts+i, verts+i+9, faceVerts);
         float norm[3];
 		Utils::calculateNormal(faceVerts, norm);
-        std::copy(norm, norm+3, pyrNorms+i);
-        std::copy(norm, norm+3, pyrNorms+i+3);
-        std::copy(norm, norm+3, pyrNorms+i+6);
+        std::copy(norm, norm+3, outNormals+i);
+        std::copy(norm, norm+3, outNormals+i+3);
+        std::copy(norm, norm+3, outNormals+i+6);
     }
-    return pyrNorms;
 }
 
 void setupVertices()
@@ -178,8 +176,7 @@ void setupVertices()
     };
 
     float pyrNorms[54];
-    float* pyrNormsPtr = calcPyramidNormals(pyrVerts);
-    std::copy(pyrNormsPtr, pyrNormsPtr+54, pyrNorms);
+    calcPyramidNormals(pyrVerts, pyrNorms);
 
     glGenVertexArrays(NUM_VAOS, vao);
     glBindVertexArray(*vao);
@@ -341,15 +338,13 @@ void setupVertices()
 void setupShadowBuffers(GLFWwindow* window)
 {
     glfwGetFramebufferSize(window, &width, &height);
-    screenSizeX = width;
-    screenSizeY = height;
     
     glGenFramebuffers(1, &shadowBuffer); // create the custom frame buffer
 
     // create the shadow texture and configure it to hold depth information
     glGenTextures(1, &shadowTex);
     glBindTexture(GL_TEXTURE_2D, shadowTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, screenSizeX, screenSizeY, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
@@ -592,6 +587,7 @@ void passTwo(GLFWwindow* window, double currentTime)
     pLoc = glGetUniformLocation(renderingProgram2, "p_matrix");
     nLoc = glGetUniformLocation(renderingProgram2, "n_matrix");
     shLoc = glGetUniformLocation(renderingProgram2, "sh_mvp_matrix");
+    winSizeLoc = glGetUniformLocation(renderingProgram2, "windowSize");
 
     // copy perspective matrix
     glUniformMatrix4fv(pLoc, 1, GL_FALSE, glm::value_ptr(pMat));
@@ -599,6 +595,9 @@ void passTwo(GLFWwindow* window, double currentTime)
     // build and copy view matrix
     vMat = glm::translate(glm::mat4(1.0f), glm::vec3(-cameraX, -cameraY, -cameraZ));
     glUniformMatrix4fv(vLoc, 1, GL_FALSE, glm::value_ptr(vMat));
+
+    // copy window size
+    glUniform2f(winSizeLoc, (float)width, (float)height);
 
     // set up lights based on the current light's position
     currLightPos = glm::vec3(initLightPos);
@@ -865,10 +864,15 @@ void display(GLFWwindow* window, double currentTime)
 
 void window_reshape_callback(GLFWwindow* window, int newWidth, int newHeight)
 {
-    // update perspective matrix
-    aspect = (float)width / (float)height; // new width & height provided by the callback
-    glViewport(0, 0, newWidth, newHeight); // set screen region associated with framebuffer
-    pMat = glm::perspective(1.0472f, aspect, 0.1f, 1000.0f); // 1.0472 radians = 60 degrees
+    width = newWidth;
+    height = newHeight;
+
+    aspect = (float)width / (float)height;
+    glViewport(0, 0, width, height); // set screen region associated with framebuffer
+    pMat = glm::perspective(1.0472f, aspect, 0.1f, 1000.0f); // update perspective matrix, 1.0472 radians = 60 degrees
+
+    glBindTexture(GL_TEXTURE_2D, shadowTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0); // update shadow size
 }
 
 int main(void)

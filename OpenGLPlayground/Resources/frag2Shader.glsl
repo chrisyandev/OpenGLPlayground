@@ -5,7 +5,7 @@ in vec3 varyingNorm;       // world-space vertex normal
 in vec3 varyingLightDir;   // vector pointing to the light
 in vec3 varyingVertPos;    // vertex position in world space
 in vec3 varyingHalfVec;    // vector between L and V
-in vec4 shadow_coord;      // shadow texture coordinates
+in vec4 shadow_coord;      // coordinates in the shadow map corresponding to the current pixel being rendered
 
 layout (binding=0) uniform sampler2D texSamp; // (binding=0) means texture unit 0
 layout (binding=1) uniform sampler2DShadow shadowSamp;
@@ -34,15 +34,18 @@ uniform vec4 globalAmb;
 uniform PositionalLight light;
 uniform Material material;
 uniform mat4 shadowMVP;
+uniform vec2 windowSize;
 
 out vec4 color;
 
-float lookup(float ox, float oy)
+// Returns the shadow depth value for a texel at distance (x,y) from shadow_coord
+float lookup(float offsetX, float offsetY)
 {
-    float t = textureProj(shadowSamp,
-        shadow_coord +
-            vec4(ox * 0.001 * shadow_coord.w, oy * 0.001 * shadow_coord.w, -0.01, 0.0));
-            // the third parameter (-0.01) is an offset to counteract shadow acne
+    float t = textureProj(shadowSamp, shadow_coord +
+        vec4(offsetX * (1 / windowSize.x) * shadow_coord.w,
+             offsetY * (1 / windowSize.y) * shadow_coord.w,
+             -0.01, 0.0));
+             // the third parameter (-0.01) is an offset to counteract shadow acne
     return t; // 0.0 = entirely in shadow, 1.0 = entirely not in shadow
 }
 
@@ -57,21 +60,21 @@ void main()
     vec3 H = normalize(varyingHalfVec);
 
     // --- 4-sample dithered soft shadow ---
-    // float swidth = 2.5; // tunable amount of shadow spread
-    // vec2 offset = mod(floor(gl_FragCoord.xy), 2.0) * swidth; // produces one of 4 sample patterns depending on gl_FragCoord%2
-    // shadowFactor += lookup(-1.5 * swidth + offset.x, 1.5 * swidth - offset.y);
-    // shadowFactor += lookup(-1.5 * swidth + offset.x, -0.5 * swidth - offset.y);
-    // shadowFactor += lookup(0.5 * swidth + offset.x, 1.5 * swidth - offset.y);
-    // shadowFactor += lookup(0.5 * swidth + offset.x, -0.5 * swidth - offset.y);
+    // float softWidth = 2.5; // tunable amount of shadow spread
+    // vec2 offset = mod(floor(gl_FragCoord.xy), 2.0) * softWidth; // produces one of 4 sample patterns depending on gl_FragCoord%2
+    // shadowFactor += lookup(-1.5 * softWidth + offset.x, 1.5 * softWidth - offset.y);
+    // shadowFactor += lookup(-1.5 * softWidth + offset.x, -0.5 * softWidth - offset.y);
+    // shadowFactor += lookup(0.5 * softWidth + offset.x, 1.5 * softWidth - offset.y);
+    // shadowFactor += lookup(0.5 * softWidth + offset.x, -0.5 * softWidth - offset.y);
     // shadowFactor = shadowFactor / 4.0; // shadowFactor is an average of the four sampled points
     // -------------------------------------
 
     // --- 64-sample high resolution soft shadow ---
-    float swidth = 2.5; // tunable amount of shadow spread
-    float endp = swidth * 3.0 + swidth / 2.0;
-    for (float m = -endp; m <= endp; m = m + swidth)
+    float stepSize = 2.5; // tunable amount of shadow spread
+    float endDist = stepSize * 3.0 + stepSize / 2.0;
+    for (float m = -endDist; m <= endDist; m = m + stepSize)
     {
-       for (float n = -endp; n <= endp; n = n + swidth)
+       for (float n = -endDist; n <= endDist; n = n + stepSize)
        {
            shadowFactor += lookup(m,n);
        }

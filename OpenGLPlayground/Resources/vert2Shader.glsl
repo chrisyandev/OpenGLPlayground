@@ -31,6 +31,7 @@ uniform vec4 globalAmb;
 uniform PositionalLight light;
 uniform Material material;
 uniform mat4 sh_mvp_matrix;
+uniform vec2 windowSize;
 
 out vec2 texCoord;          // texture coordinate
 out vec3 varyingNorm;       // world-space vertex normal
