@@ -47,6 +47,9 @@
     <None Include="Resources\frag1Shader.glsl">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="Resources\compShader.glsl">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Public\Utils.h">

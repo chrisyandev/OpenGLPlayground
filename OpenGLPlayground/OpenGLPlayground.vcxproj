@@ -27,6 +27,7 @@
     <ClCompile Include="Private\Utils.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Resources\compShader.glsl" />
     <None Include="Resources\frag1Shader.glsl" />
     <None Include="Resources\frag2Shader.glsl" />
     <None Include="Resources\vert1Shader.glsl" />

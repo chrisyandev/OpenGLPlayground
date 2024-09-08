@@ -28,6 +28,24 @@ std::string Utils::readShaderSource(const char* filePath)
     return content;
 }
 
+GLuint Utils::createShaderProgram(const char* cp)
+{
+    GLuint cShader = glCreateShader(GL_COMPUTE_SHADER);
+    std::string compShaderStr = readShaderSource(cp);
+    const char* compShaderSrc = compShaderStr.c_str();
+
+    glShaderSource(cShader, 1, &compShaderSrc, NULL);
+    glCompileShader(cShader);
+    checkCompileErrors(cShader, "COMPUTE");
+
+    GLuint cProgram = glCreateProgram();
+    glAttachShader(cProgram, cShader);
+    glLinkProgram(cProgram);
+    checkCompileErrors(cProgram, "PROGRAM");
+
+    return cProgram;
+}
+
 GLuint Utils::createShaderProgram(const char* vp, const char* fp)
 {
     GLuint vShader = glCreateShader(GL_VERTEX_SHADER);

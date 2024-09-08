@@ -67,6 +67,13 @@ glm::mat4 lightPmatrix;
 glm::mat4 shadowMVP;
 glm::mat4 b;
 
+// compute shader variables
+GLuint ssbo[3];
+GLuint computeShader;
+int csInput1[] = { 10, 12, 16, 18, 50, 17 };
+int csInput2[] = { 30, 14, 80, 20, 51, 12 };
+int csOutput[6];
+
 void calcPyramidNormals(const float* verts, float* outNormals)
 {
     for (int i = 0; i < 54; i+=9)
@@ -381,6 +388,34 @@ void init(GLFWwindow* window)
     brickTexture = Utils::loadTexture(resourcePath, "brick1.jpg");
     earthTexture = Utils::loadTexture(resourcePath, "earthmap1k.jpg");
     shuttleTexture = Utils::loadTexture(resourcePath, "spstob_1.jpg");
+
+    // --- compute shader setup ---
+    std::string compShaderPath = resourcePath + "compShader.glsl";
+    computeShader = Utils::createShaderProgram(compShaderPath.c_str());
+
+    glGenBuffers(3, ssbo);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo[0]);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(csInput1), csInput1, GL_STATIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo[1]);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(csInput2), csInput2, GL_STATIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo[2]);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(csOutput), csOutput, GL_STATIC_READ);
+    // ----------------------------
+}
+
+void computeSum()
+{
+    glUseProgram(computeShader);
+
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo[0]);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ssbo[1]);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, ssbo[2]);
+
+    glDispatchCompute(6, 1, 1);
+    glMemoryBarrier(GL_ALL_BARRIER_BITS);
+
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo[2]);
+    glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(csOutput), csOutput);
 }
 
 void installLights(GLuint renderingProgram)
@@ -903,6 +938,13 @@ int main(void)
     glfwSetWindowSizeCallback(window, window_reshape_callback);
 
     init(window);
+
+    // --- compute shader output ---
+    computeSum();
+    std::cout << csInput1[0] << " " << csInput1[1] << " " << csInput1[2] << " " << csInput1[3] << " " << csInput1[4] << " " << csInput1[5] << std::endl;
+    std::cout << csInput2[0] << " " << csInput2[1] << " " << csInput2[2] << " " << csInput2[3] << " " << csInput2[4] << " " << csInput2[5] << std::endl;
+    std::cout << csOutput[0] << " " << csOutput[1] << " " << csOutput[2] << " " << csOutput[3] << " " << csOutput[4] << " " << csOutput[5] << std::endl;
+    // -----------------------------
 
     while (!glfwWindowShouldClose(window))
     {
