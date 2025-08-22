@@ -89,11 +89,11 @@ GLuint Utils::loadTexture(const std::string& directoryPath, const std::string& t
     }
 
     // if mipmapping
-    glBindTexture(GL_TEXTURE_2D, textureID);
+//    glBindTexture(GL_TEXTURE_2D, textureID);
     //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glGenerateMipmap(GL_TEXTURE_2D);
+//    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+//    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+//    glGenerateMipmap(GL_TEXTURE_2D);
     
     // if also anisotropic filtering
     GLfloat anisoSetting = 0.0f;

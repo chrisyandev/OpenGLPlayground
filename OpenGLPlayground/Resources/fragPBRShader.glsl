@@ -1,20 +1,15 @@
 #version 430 core
 
-in vec3 WorldPos;
 in vec2 TexCoords;
-in vec3 Normal;
 
 uniform vec3 albedoScale;
 uniform float metallicScale;
 uniform float roughnessScale;
 uniform float aoScale;
 
-// texture sampling
-layout (binding=0) uniform sampler2D albedoMap;
-layout (binding=1) uniform sampler2D metallicMap;
-layout (binding=2) uniform sampler2D roughnessMap;
-layout (binding=3) uniform sampler2D aoMap;
-layout (binding=4) uniform sampler2D normalMap;
+layout (binding=0) uniform sampler2D gPosition;
+layout (binding=1) uniform sampler2D gNormal;
+layout (binding=2) uniform sampler2D gAlbedoSpec;
 
 uniform vec3 lightPositions[4];
 uniform vec3 lightColors[4];
@@ -55,7 +50,7 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
     float NdotL = max(dot(N, L), 0.0);
     float ggx2 = GeometrySchlickGGX(NdotV, roughness);
     float ggx1 = GeometrySchlickGGX(NdotL, roughness);
-
+        
     return ggx1 * ggx2;
 }
 
@@ -66,8 +61,11 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0)
 
 vec3 getNormalFromMap()
 {
-    vec3 tangentNormal = texture(normalMap, TexCoords).xyz * 2.0 - 1.0;
-
+    vec3 tangentNormal = texture(gNormal, TexCoords).xyz * 2.0 - 1.0;
+// todo
+    vec3 WorldPos = texture(gPosition, TexCoords).rgb;
+    vec3 Normal = texture(gNormal, TexCoords).rgb;
+//
     vec3 Q1  = dFdx(WorldPos);
     vec3 Q2  = dFdy(WorldPos);
     vec2 st1 = dFdx(TexCoords);
@@ -83,27 +81,32 @@ vec3 getNormalFromMap()
 
 void main()
 {
+    vec3 WorldPos = texture(gPosition, TexCoords).rgb;
+    vec3 Normal = texture(gNormal, TexCoords).rgb;
+
     vec3 albedo;
     float metallic, roughness, ao;
 
-    albedo = texture(albedoMap, TexCoords).rgb;
-    if (albedo != vec3(0.0, 0.0, 0.0)) // if there is a texture
-    {
+    albedo = texture(gAlbedoSpec, TexCoords).rgb;
+//    if (albedo != vec3(0.0, 0.0, 0.0)) // if there is a texture
+ //   {
         albedo    = pow(albedo, vec3(2.2)) * albedoScale; // raising to power of 2.2 removes the gamma correction and converts the color from sRGB to linear space
-        metallic  = texture(metallicMap, TexCoords).r * metallicScale;
-        roughness = texture(roughnessMap, TexCoords).r * roughnessScale;
-        ao        = texture(aoMap, TexCoords).r * aoScale;
-    }
-    else
-    {
-        albedo = albedoScale;
-        metallic = metallicScale;
-        roughness = roughnessScale;
-        ao = aoScale;
-    }
+        metallic  = texture(gAlbedoSpec, TexCoords).a * metallicScale;
+        roughness = metallic * roughnessScale;
+        ao        = metallic * aoScale;
+//    }
+//    else
+//    {
+//        albedo = albedoScale;
+//        metallic = metallicScale;
+//        roughness = roughnessScale;
+//        ao = aoScale;
+//    }
 
-    vec3 N = getNormalFromMap();
+// todo
+    vec3 N = normalize(Normal);
     vec3 V = normalize(camPos - WorldPos);
+//
 
     // calculate reflectance at normal incidence; if dia-electric (like plastic) use F0 
     // of 0.04 and if it's a metal, use the albedo color as F0 (metallic workflow)
@@ -122,11 +125,11 @@ void main()
         vec3 radiance = lightColors[i] * attenuation;
 
         // Cook-Torrance BRDF
-        float NDF = DistributionGGX(N, H, roughness);   
-        float G   = GeometrySmith(N, V, L, roughness);      
+        float NDF = DistributionGGX(N, H, roughness);  
+        float G   = GeometrySmith(N, V, L, roughness);
         vec3 F    = fresnelSchlick(clamp(dot(H, V), 0.0, 1.0), F0);
            
-        vec3 numerator    = NDF * G * F; 
+        vec3 numerator    = NDF * G * F;
         float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001; // + 0.0001 to prevent divide by zero
         vec3 specular = numerator / denominator;
         
@@ -142,11 +145,11 @@ void main()
         kD *= 1.0 - metallic;
 
         // scale light by NdotL
-        float NdotL = max(dot(N, L), 0.0);        
+        float NdotL = max(dot(N, L), 0.0);
 
         // add to outgoing radiance Lo
         Lo += (kD * albedo / PI + specular) * radiance * NdotL;  // note that we already multiplied the BRDF by the Fresnel (kS) so we won't multiply by kS again
-    }   
+    }
     
     // ambient lighting (note that the next IBL tutorial will replace 
     // this ambient lighting with environment lighting).

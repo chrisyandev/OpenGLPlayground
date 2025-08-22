@@ -50,10 +50,34 @@
     <None Include="Resources\fragPBRShader.glsl">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="Resources\vertPBRShader.glsl">
+      <Filter>Resource Files</Filter>
+    </None>
     <None Include="Resources\fragStencilShader.glsl">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="Resources\vertPBRShader.glsl">
+    <None Include="Resources\vertDeferredShader.glsl">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="Resources\fragDeferredShader.glsl">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="Resources\vertGBufferShader.glsl">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="Resources\fragGBufferShader.glsl">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="Resources\vertLightBoxShader.glsl">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="Resources\fragLightBoxShader.glsl">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="Resources\vertDebugFBOShader.glsl">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="Resources\fragDebugFBOShader.glsl">
       <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>

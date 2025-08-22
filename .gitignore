@@ -364,3 +364,9 @@ FodyWeavers.xsd
 
 # Don't ignore resources files such as OBJ
 !OpenGLPlayground/Resources/*
+
+# Don't include the executable manually copied into root folder
+OpenGLPlayground.exe
+
+# Ignore captures
+Captures/

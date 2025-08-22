@@ -10,72 +10,39 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include "Utils.h"
 #include "Sphere.h"
-#include "Torus.h"
-#include "ImportedModel.h"
 
-constexpr GLuint SCR_WIDTH = 800;
-constexpr GLuint SCR_HEIGHT = 600;
+constexpr GLuint SCR_WIDTH = 1800;
+constexpr GLuint SCR_HEIGHT = 1600;
 constexpr GLuint NUM_VAOS = 1;
-constexpr GLuint NUM_VBOS = 17;
+constexpr GLuint NUM_VBOS = 7;
 constexpr GLsizei cubeStride = 8 * sizeof(float);
 
 std::string resourcePath;
 float cameraX, cameraY, cameraZ;
-GLuint renderingProgram1, renderingProgram2;
 GLuint vao[NUM_VAOS];
 GLuint vbo[NUM_VBOS];
 Sphere mySphere(48);
-Torus myTorus(0.5f, 0.2f, 48);
-ImportedModel myShuttle("shuttle.obj");
-ImportedModel myDolphin("dolphinHighPoly.obj");
 
 // allocate variables used in display() function, so that they won�t need to be allocated during rendering
-int width, height;
+int width = SCR_WIDTH, height = SCR_HEIGHT;
 float aspect;
 glm::mat4 mMat, vMat, pMat, invTrMat;
-glm::vec3 currLightPos, lightPosV;
-float lightPos[3];
 std::stack<glm::mat4> trfmStack;
-GLuint brickTexture;
-GLuint earthTexture;
-GLuint shuttleTexture;
+GLuint brickTexture, earthTexture;
 
 // shader uniform locations
 GLuint mLoc, vLoc, pLoc, nLoc, shLoc;
-GLuint lightAmbLoc, lightDifLoc, lightSpeLoc, lightPosLoc;
-GLuint matAmbLoc, matDifLoc, matSpeLoc, matShiLoc;
 GLuint globalAmbLoc, winSizeLoc;
-
-// light properties
-glm::vec3 initLightPos(-5.0f, 3.0f, 4.0f);
-float globalAmb[4] = { 0.7f, 0.7f, 0.7f, 1.0f };
-float lightAmb[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-float lightDif[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-float lightSpe[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-
-// material properties
-float* matAmb = Utils::silverAmbient();
-float* matDif = Utils::silverDiffuse();
-float* matSpe = Utils::silverSpecular();
-float matShi = Utils::silverShininess();
-
-// shadow-related variables
-int screenSizeX, screenSizeY;
-GLuint shadowTex, shadowBuffer;
-glm::mat4 lightVmatrix;
-glm::mat4 lightPmatrix;
-glm::mat4 shadowMVP;
-glm::mat4 b;
 
 // PBR-related
 GLuint pbrProgram;
 glm::mat3 nMat;
 glm::vec3 lightPositions[] =
 {
-    glm::vec3(-10.0f,  10.0f, 10.0f),
-    glm::vec3(10.0f,  10.0f, 10.0f),
-    glm::vec3(-10.0f, -10.0f, 10.0f),
-    glm::vec3(10.0f, -10.0f, 10.0f),
+    glm::vec3(-10.0f,  20.0f, 10.0f),
+    glm::vec3(10.0f,  20.0f, 10.0f),
+    glm::vec3(-10.0f, 20.0f, 10.0f),
+    glm::vec3(10.0f, 20.0f, 10.0f),
 };
 glm::vec3 lightColors[] =
 {
@@ -85,20 +52,23 @@ glm::vec3 lightColors[] =
     glm::vec3(300.0f, 300.0f, 300.0f)
 };
 
-// Stencil-related
-GLuint stencilProgram;
+// Deferred-related
+GLuint gBufferProgram;
+GLuint gBuffer, gPosition, gNormal, gAlbedoSpec;
+GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+GLuint rboDepth;
 
 void calcPyramidNormals(const float* verts, float* outNormals)
 {
-    for (int i = 0; i < 54; i+=9)
+    for (int i = 0; i < 54; i += 9)
     {
         float faceVerts[9];
-        std::copy(verts+i, verts+i+9, faceVerts);
+        std::copy(verts + i, verts + i + 9, faceVerts);
         float norm[3];
-		Utils::calculateNormal(faceVerts, norm);
-        std::copy(norm, norm+3, outNormals+i);
-        std::copy(norm, norm+3, outNormals+i+3);
-        std::copy(norm, norm+3, outNormals+i+6);
+        Utils::calculateNormal(faceVerts, norm);
+        std::copy(norm, norm + 3, outNormals + i);
+        std::copy(norm, norm + 3, outNormals + i + 3);
+        std::copy(norm, norm + 3, outNormals + i + 6);
     }
 }
 
@@ -177,13 +147,13 @@ void setupVertices()
     float pyrTexCoords[36] =
     {
          0.0f, 0.0f, // front face
-         1.0f, 0.0f, 
-         0.5f, 1.0f,    
+         1.0f, 0.0f,
+         0.5f, 1.0f,
          0.0f, 0.0f, // right face
-         1.0f, 0.0f,  
+         1.0f, 0.0f,
          0.5f, 1.0f,
          0.0f, 0.0f, // back face
-         1.0f, 0.0f,  
+         1.0f, 0.0f,
          0.5f, 1.0f,
          0.0f, 0.0f, // left face
          1.0f, 0.0f,
@@ -200,10 +170,9 @@ void setupVertices()
     calcPyramidNormals(pyrVerts, pyrNorms);
 
     glGenVertexArrays(NUM_VAOS, vao);
-    glBindVertexArray(*vao);
+    glBindVertexArray(vao[0]);
 
     glGenBuffers(NUM_VBOS, vbo);
-
     glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
     glBufferData(GL_ARRAY_BUFFER, sizeof(cubeData), cubeData, GL_STATIC_DRAW);
     
@@ -213,7 +182,7 @@ void setupVertices()
     glBindBuffer(GL_ARRAY_BUFFER, vbo[2]);
     glBufferData(GL_ARRAY_BUFFER, sizeof(pyrTexCoords), pyrTexCoords, GL_STATIC_DRAW);
 
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[13]);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[3]);
     glBufferData(GL_ARRAY_BUFFER, 54 * sizeof(float), pyrNorms, GL_STATIC_DRAW);
 
     // ------------------------------ procedural sphere -------------------------------
@@ -242,162 +211,71 @@ void setupVertices()
     }
 
     // put the vertices into buffer #4
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[3]);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[4]);
     glBufferData(GL_ARRAY_BUFFER, sphPosVals.size() * 4, &sphPosVals[0], GL_STATIC_DRAW);
     // put the texture coordinates into buffer #5
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[4]);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[5]);
     glBufferData(GL_ARRAY_BUFFER, sphTexVals.size() * 4, &sphTexVals[0], GL_STATIC_DRAW);
     // put the normals into buffer #6
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[5]);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[6]);
     glBufferData(GL_ARRAY_BUFFER, sphNormVals.size() * 4, &sphNormVals[0], GL_STATIC_DRAW);
     // ----------------------------------------------------------------------------------
-
-    // ------------------------------ procedural torus ----------------------------------
-    std::vector<int> torIdxs = myTorus.getIndices();
-    std::vector<glm::vec3> torVerts = myTorus.getVertices();
-    std::vector<glm::vec2> torTexs = myTorus.getTexCoords();
-    std::vector<glm::vec3> torNorms = myTorus.getNormals();
-    std::vector<float> torPosVals; // vertex positions
-    std::vector<float> torTexVals; // texture coordinates
-    std::vector<float> torNormVals; // normal vectors
-
-    // flatten every vector into array of floats
-    int torNumVerts = myTorus.getNumVertices();
-    for (int i = 0; i < torNumVerts; i++)
-    {
-        torPosVals.push_back(torVerts[i].x);
-        torPosVals.push_back(torVerts[i].y);
-        torPosVals.push_back(torVerts[i].z);
-
-        torTexVals.push_back(torTexs[i].s);
-        torTexVals.push_back(torTexs[i].t);
-
-        torNormVals.push_back(torNorms[i].x);
-        torNormVals.push_back(torNorms[i].y);
-        torNormVals.push_back(torNorms[i].z);
-    }
-
-    // put the vertices into buffer #7
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[6]);
-    glBufferData(GL_ARRAY_BUFFER, torPosVals.size() * 4, &torPosVals[0], GL_STATIC_DRAW);
-    // put the texture coordinates into buffer #8
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[7]);
-    glBufferData(GL_ARRAY_BUFFER, torTexVals.size() * 4, &torTexVals[0], GL_STATIC_DRAW);
-    // put the normals into buffer #9
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[8]);
-    glBufferData(GL_ARRAY_BUFFER, torNormVals.size() * 4, &torNormVals[0], GL_STATIC_DRAW);
-    // put the indices into buffer #10
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo[9]);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, torIdxs.size() * 4, &torIdxs[0], GL_STATIC_DRAW);
-    // ----------------------------------------------------------------------------------
-
-    // ------------------------------- imported shuttle -----------------------------------
-    std::vector<glm::vec3> shuVerts = myShuttle.getVertices();
-    std::vector<glm::vec2> shuTexs = myShuttle.getTextureCoords();
-    std::vector<glm::vec3> shuNorms = myShuttle.getNormals();
-    std::vector<float> shuPosVals; // vertex positions
-    std::vector<float> shuTexVals; // texture coordinates
-    std::vector<float> shuNormVals; // normal vectors
-
-    int shuNumVertices = myShuttle.getNumVertices();
-    for (int i = 0; i < shuNumVertices; i++)
-    {
-        shuPosVals.push_back(shuVerts[i].x);
-        shuPosVals.push_back(shuVerts[i].y);
-        shuPosVals.push_back(shuVerts[i].z);
-        shuTexVals.push_back(shuTexs[i].s);
-        shuTexVals.push_back(shuTexs[i].t);
-        shuNormVals.push_back(shuNorms[i].x);
-        shuNormVals.push_back(shuNorms[i].y);
-        shuNormVals.push_back(shuNorms[i].z);
-    }
-
-    // put the vertices into buffer #11
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[10]);
-    glBufferData(GL_ARRAY_BUFFER, shuPosVals.size() * 4, &shuPosVals[0], GL_STATIC_DRAW);
-    // put the texture coordinates into buffer #12
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[11]);
-    glBufferData(GL_ARRAY_BUFFER, shuTexVals.size() * 4, &shuTexVals[0], GL_STATIC_DRAW);
-    // put the normals into buffer #13
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[12]);
-    glBufferData(GL_ARRAY_BUFFER, shuNormVals.size() * 4, &shuNormVals[0], GL_STATIC_DRAW);
-    // ------------------------------------------------------------------------------------
-
-        // ------------------------------- imported dolphin -----------------------------------
-    std::vector<glm::vec3> dolVerts = myDolphin.getVertices();
-    std::vector<glm::vec2> dolTexs = myDolphin.getTextureCoords();
-    std::vector<glm::vec3> dolNorms = myDolphin.getNormals();
-    std::vector<float> dolPosVals; // vertex positions
-    std::vector<float> dolTexVals; // texture coordinates
-    std::vector<float> dolNormVals; // normal vectors
-
-    int dolNumVertices = myDolphin.getNumVertices();
-    for (int i = 0; i < dolNumVertices; i++)
-    {
-        dolPosVals.push_back(dolVerts[i].x);
-        dolPosVals.push_back(dolVerts[i].y);
-        dolPosVals.push_back(dolVerts[i].z);
-        dolTexVals.push_back(dolTexs[i].s);
-        dolTexVals.push_back(dolTexs[i].t);
-        dolNormVals.push_back(dolNorms[i].x);
-        dolNormVals.push_back(dolNorms[i].y);
-        dolNormVals.push_back(dolNorms[i].z);
-    }
-
-    // put the vertices into buffer #15
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[14]);
-    glBufferData(GL_ARRAY_BUFFER, dolPosVals.size() * 4, &dolPosVals[0], GL_STATIC_DRAW);
-    // put the texture coordinates into buffer #16
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[15]);
-    glBufferData(GL_ARRAY_BUFFER, dolTexVals.size() * 4, &dolTexVals[0], GL_STATIC_DRAW);
-    // put the normals into buffer #17
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[16]);
-    glBufferData(GL_ARRAY_BUFFER, dolNormVals.size() * 4, &dolNormVals[0], GL_STATIC_DRAW);
-    // ----------------------------------------------------------------------------------------
 }
 
-void setupShadowBuffers(GLFWwindow* window)
+void setupGBuffer()
 {
-    glfwGetFramebufferSize(window, &width, &height);
-    
-    glGenFramebuffers(1, &shadowBuffer); // create the custom frame buffer
+    glGenFramebuffers(1, &gBuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
 
-    // create the shadow texture and configure it to hold depth information
-    glGenTextures(1, &shadowTex);
-    glBindTexture(GL_TEXTURE_2D, shadowTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+    glGenTextures(1, &gPosition);
+    glBindTexture(GL_TEXTURE_2D, gPosition);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gPosition, 0);
+
+    glGenTextures(1, &gNormal);
+    glBindTexture(GL_TEXTURE_2D, gNormal);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gNormal, 0);
+
+    glGenTextures(1, &gAlbedoSpec);
+    glBindTexture(GL_TEXTURE_2D, gAlbedoSpec);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gAlbedoSpec, 0);
+
+    glDrawBuffers(3, attachments);
+
+    glGenRenderbuffers(1, &rboDepth);
+    glBindRenderbuffer(GL_RENDERBUFFER, rboDepth);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rboDepth);
+    // finally check if framebuffer is complete
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+    {
+        std::cout << "Framebuffer not complete!" << std::endl;
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void init(GLFWwindow* window)
 {
     resourcePath = Utils::getResourcePath();
-    std::string vert1ShaderPath = resourcePath + "vert1Shader.glsl";
-    std::string frag1ShaderPath = resourcePath + "frag1Shader.glsl";
-    std::string vert2ShaderPath = resourcePath + "vert2Shader.glsl";
-    std::string frag2ShaderPath = resourcePath + "frag2Shader.glsl";
     std::string vertPBRShaderPath = resourcePath + "vertPBRShader.glsl";
     std::string fragPBRShaderPath = resourcePath + "fragPBRShader.glsl";
-    std::string fragStencilShaderPath = resourcePath + "fragStencilShader.glsl";
-    renderingProgram1 = Utils::createShaderProgram(vert1ShaderPath.c_str(), frag1ShaderPath.c_str());
-    renderingProgram2 = Utils::createShaderProgram(vert2ShaderPath.c_str(), frag2ShaderPath.c_str());
+    std::string vertGBufferShaderPath = resourcePath + "vertGBufferShader.glsl";
+    std::string fragGBufferShaderPath = resourcePath + "fragGBufferShader.glsl";
     pbrProgram = Utils::createShaderProgram(vertPBRShaderPath.c_str(), fragPBRShaderPath.c_str());
-    stencilProgram = Utils::createShaderProgram(vertPBRShaderPath.c_str(), fragStencilShaderPath.c_str());
+    gBufferProgram = Utils::createShaderProgram(vertGBufferShaderPath.c_str(), fragGBufferShaderPath.c_str());
 
     cameraX = 0.0f; cameraY = 0.0f; cameraZ = 8.0f;
-    currLightPos = glm::vec3(initLightPos);
 
     setupVertices();
-    setupShadowBuffers(window);
-
-    b = glm::mat4(
-        0.5f, 0.0f, 0.0f, 0.0f,
-        0.0f, 0.5f, 0.0f, 0.0f,
-        0.0f, 0.0f, 0.5f, 0.0f,
-        0.5f, 0.5f, 0.5f, 1.0f);
+    setupGBuffer();
 
     // build perspective matrix
     glfwGetFramebufferSize(window, &width, &height);
@@ -406,214 +284,68 @@ void init(GLFWwindow* window)
 
     brickTexture = Utils::loadTexture(resourcePath, "brick1.jpg");
     earthTexture = Utils::loadTexture(resourcePath, "earthmap1k.jpg");
-    shuttleTexture = Utils::loadTexture(resourcePath, "spstob_1.jpg");
 }
 
-void installLights(GLuint renderingProgram)
+// renderQuad() renders a 1x1 XY quad in NDC
+// -----------------------------------------
+unsigned int quadVAO = 0;
+unsigned int quadVBO;
+void renderQuad()
 {
-    // save the light position in a float array
-    lightPos[0] = currLightPos.x;
-    lightPos[1] = currLightPos.y;
-    lightPos[2] = currLightPos.z;
+    if (quadVAO == 0)
+    {
+        float quadVertices[] = {
+            // positions        // texture Coords
+            -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+            -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+             1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+             1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+        };
+        // setup plane VAO
+        glGenVertexArrays(1, &quadVAO);
+        glGenBuffers(1, &quadVBO);
+        glBindVertexArray(quadVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    }
+    glBindVertexArray(quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    // todo
+    glDisable(GL_CULL_FACE); // needed
+    glDisable(GL_DEPTH_TEST);
+    // ----
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-    // get the locations of the light and material fields in the shader
-    globalAmbLoc = glGetUniformLocation(renderingProgram, "globalAmb");
-    lightAmbLoc = glGetUniformLocation(renderingProgram, "light.ambient");
-    lightDifLoc = glGetUniformLocation(renderingProgram, "light.diffuse");
-    lightSpeLoc = glGetUniformLocation(renderingProgram, "light.specular");
-    lightPosLoc = glGetUniformLocation(renderingProgram, "light.position");
-    matAmbLoc = glGetUniformLocation(renderingProgram, "material.ambient");
-    matDifLoc = glGetUniformLocation(renderingProgram, "material.diffuse");
-    matSpeLoc = glGetUniformLocation(renderingProgram, "material.specular");
-    matShiLoc = glGetUniformLocation(renderingProgram, "material.shininess");
-
-    // set the uniform light and material values in the shader
-    glProgramUniform4fv(renderingProgram, globalAmbLoc, 1, globalAmb);
-    glProgramUniform4fv(renderingProgram, lightAmbLoc, 1, lightAmb);
-    glProgramUniform4fv(renderingProgram, lightDifLoc, 1, lightDif);
-    glProgramUniform4fv(renderingProgram, lightSpeLoc, 1, lightSpe);
-    glProgramUniform3fv(renderingProgram, lightPosLoc, 1, lightPos);
-    glProgramUniform4fv(renderingProgram, matAmbLoc, 1, matAmb);
-    glProgramUniform4fv(renderingProgram, matDifLoc, 1, matDif);
-    glProgramUniform4fv(renderingProgram, matSpeLoc, 1, matSpe);
-    glProgramUniform1f(renderingProgram, matShiLoc, matShi);
-}
-
-void passOne(GLFWwindow* window, double currentTime)
-{
-    glUseProgram(renderingProgram1);
-
-    glClear(GL_DEPTH_BUFFER_BIT);
-	glEnable(GL_CULL_FACE);
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LEQUAL); // passes if the incoming depth value is less than or equal to the stored depth value
-
-    // reference uniform variables
-    shLoc = glGetUniformLocation(renderingProgram1, "sh_mvp_matrix");
-
-    trfmStack.push(glm::mat4(1.0f)); // + initial matrix
-
-    // ---------------------- pyramid == sun --------------------------------------------
-    trfmStack.push(trfmStack.top()); // ++ copy default matrix
-    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)); // sun position
-    trfmStack.push(trfmStack.top()); // +++ push another transform because we want child objects to be relative to the translation above
-    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(1.0f, 0.0f, 0.0f)); // sun rotation
-    mMat = trfmStack.top();
-
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(0);
-    glFrontFace(GL_CCW); // the pyramid vertices have counter-clockwise winding order
-        // --- pyramid shadowing ---
-    shadowMVP = lightPmatrix * lightVmatrix * mMat;
-    glUniformMatrix4fv(shLoc, 1, GL_FALSE, glm::value_ptr(shadowMVP));
-        // ------------------------------
-    glDrawArrays(GL_TRIANGLES, 0, 18); // draw the sun
-    trfmStack.pop(); // ++ sun's axial rotation removed
-    // ----------------------------------------------------------------------------------
-
-    // ----------------------- cube == planet -------------------------------------------
-    trfmStack.push(trfmStack.top()); // +++ inherit sun's translation
-    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(sin((float)currentTime) * 4.0, 0.0f, cos((float)currentTime) * 4.0));
-    trfmStack.push(trfmStack.top()); // ++++ push another transform because we want child objects to be relative to the translation above
-    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0, 1.0, 0.0)); // planet rotation
-    trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(0.75f, 0.75f, 0.75f));
-    mMat = trfmStack.top();
-    
+// todo
+    glBindVertexArray(vao[0]);
     glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, cubeStride, 0);
-    glEnableVertexAttribArray(0);
-    glFrontFace(GL_CW); // the cube vertices have clockwise winding order
-        // --- cube shadowing ---
-    shadowMVP = lightPmatrix * lightVmatrix * mMat;
-    glUniformMatrix4fv(shLoc, 1, GL_FALSE, glm::value_ptr(shadowMVP));
-        // ----------------------
-    glDrawArrays(GL_TRIANGLES, 0, 36); // draw the planet
-    trfmStack.pop(); // +++ planet's rotation axis and scaling removed
-
-    // ----------------------- smaller cube == moon -------------------------------------
-    trfmStack.push(trfmStack.top()); // ++++ inherit planet's translation
-    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, sin((float)currentTime) * 2.0, cos((float)currentTime) * 2.0));
-    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0, 0.0, 1.0)); // moon rotation
-    trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(0.25f, 0.25f, 0.25f)); // make the moon smaller
-    mMat = trfmStack.top();
-
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, cubeStride, 0);
-    glEnableVertexAttribArray(0);
-        // --- smaller cube shadowing ---
-    shadowMVP = lightPmatrix * lightVmatrix * mMat;
-    glUniformMatrix4fv(shLoc, 1, GL_FALSE, glm::value_ptr(shadowMVP));
-        // ------------------------------
-    glDrawArrays(GL_TRIANGLES, 0, 36); // draw the moon
-
-    trfmStack.pop(); // +++ remove moon's transformations
-    trfmStack.pop(); // ++ remove planet's translation
-    // ----------------------------------------------------------------------------------
-
-    // ------------------------------ procedural sphere ---------------------------------
-    trfmStack.push(trfmStack.top()); // +++ inherit sun's translation
-    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(-2.0f, 0.0f, 0.0f));
-    trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, 1.0f, 1.0f));
-    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0f, 1.0f, 0.0f));
-    mMat = trfmStack.top();
-
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[3]);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(0);
-    glFrontFace(GL_CCW); // the sphere vertices have clockwise winding order
-        // --- sphere shadowing ---
-    shadowMVP = lightPmatrix * lightVmatrix * mMat;
-    glUniformMatrix4fv(shLoc, 1, GL_FALSE, glm::value_ptr(shadowMVP));
-        // ------------------------
-    glDrawArrays(GL_TRIANGLES, 0, mySphere.getNumIndices());
-
-    trfmStack.pop(); // ++ remove sphere's transformations
-    // ----------------------------------------------------------------------------------
-
-    // ------------------------------ procedural torus ----------------------------------
-    trfmStack.push(trfmStack.top()); // +++ inherit sun's translation
-    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(2.0f, 0.0f, 0.0f));
-    trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(2.0f, 2.0f, 2.0f));
-    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), Utils::toRadians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0f, -1.0, 0.0f));
-    mMat = trfmStack.top();
-
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[6]);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(0);
-    glFrontFace(GL_CCW);
-        // --- torus shadowing ----
-    shadowMVP = lightPmatrix * lightVmatrix * mMat;
-    glUniformMatrix4fv(shLoc, 1, GL_FALSE, glm::value_ptr(shadowMVP));
-        // ------------------------
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo[9]);
-    glDrawElements(GL_TRIANGLES, myTorus.getNumIndices(), GL_UNSIGNED_INT, 0);
-
-    trfmStack.pop(); // ++ remove torus's transformations
-    // ----------------------------------------------------------------------------------
-
-    // ------------------------------- imported shuttle -----------------------------------
-    trfmStack.push(trfmStack.top()); // +++ inherit sun's translation
-    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(cos((float)currentTime) * 4.0f, sin((float)currentTime) * 4.0f, cos((float)currentTime) * 4.0f));
-    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(1.0, 1.0, 0.0));
-    trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(4.0f, 4.0f, 4.0f));
-    mMat = trfmStack.top();
-
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[10]);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(0);
-    glFrontFace(GL_CCW);
-        // --- shuttle shadowing ----
-    shadowMVP = lightPmatrix * lightVmatrix * mMat;
-    glUniformMatrix4fv(shLoc, 1, GL_FALSE, glm::value_ptr(shadowMVP));
-        // --------------------------
-    glDrawArrays(GL_TRIANGLES, 0, myShuttle.getNumVertices());
-
-    trfmStack.pop(); // ++ remove shuttle's transformations
-    // ------------------------------------------------------------------------------------
-
-    // ------------------------------- imported dolphin -----------------------------------
-    trfmStack.push(trfmStack.top()); // +++ inherit sun's translation
-    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(cos((float)currentTime) * 4.0f, -sin((float)currentTime) * 4.0f, -cos((float)currentTime) * 4.0f));
-    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), -(float)currentTime, glm::vec3(1.0, 1.0, 0.0));
-    trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(4.0f, 4.0f, 4.0f));
-    mMat = trfmStack.top();
-
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[14]);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(0);
-    glFrontFace(GL_CCW);
-        // --- dolphin shadowing ----
-    shadowMVP = lightPmatrix * lightVmatrix * mMat;
-    glUniformMatrix4fv(shLoc, 1, GL_FALSE, glm::value_ptr(shadowMVP));
-        // --------------------------
-    glDrawArrays(GL_TRIANGLES, 0, myDolphin.getNumVertices());
-
-    trfmStack.pop(); // ++ remove dolphin's transformations
-    // ------------------------------------------------------------------------------------
-
-    trfmStack.pop(); // + remove sun's translation
-    trfmStack.pop(); // remove initial matrix
-
+// ----
 }
 
-void passTwo(GLFWwindow* window, double currentTime)
+void geometryPass(GLFWwindow* window, double currentTime)
 {
-    glUseProgram(renderingProgram2);
-
-    glClear(GL_DEPTH_BUFFER_BIT);
+    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
     glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
 
+// todo
+    glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
+    //glBindFramebuffer(GL_DRAW_FRAMEBUFFER, gBuffer);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+//
+
+    glUseProgram(gBufferProgram);
+
     // reference uniform variables
-    mLoc = glGetUniformLocation(renderingProgram2, "m_matrix");
-    vLoc = glGetUniformLocation(renderingProgram2, "v_matrix");
-    pLoc = glGetUniformLocation(renderingProgram2, "p_matrix");
-    nLoc = glGetUniformLocation(renderingProgram2, "n_matrix");
-    shLoc = glGetUniformLocation(renderingProgram2, "sh_mvp_matrix");
-    winSizeLoc = glGetUniformLocation(renderingProgram2, "windowSize");
+    mLoc = glGetUniformLocation(gBufferProgram, "m_matrix");
+    vLoc = glGetUniformLocation(gBufferProgram, "v_matrix");
+    pLoc = glGetUniformLocation(gBufferProgram, "p_matrix");
+    nLoc = glGetUniformLocation(gBufferProgram, "n_matrix");
 
     // copy perspective matrix
     glUniformMatrix4fv(pLoc, 1, GL_FALSE, glm::value_ptr(pMat));
@@ -622,18 +354,11 @@ void passTwo(GLFWwindow* window, double currentTime)
     vMat = glm::translate(glm::mat4(1.0f), glm::vec3(-cameraX, -cameraY, -cameraZ));
     glUniformMatrix4fv(vLoc, 1, GL_FALSE, glm::value_ptr(vMat));
 
-    // copy window size
-    glUniform2f(winSizeLoc, (float)width, (float)height);
-
-    // set up lights based on the current light's position
-    currLightPos = glm::vec3(initLightPos);
-    installLights(renderingProgram2);
-
     trfmStack.push(glm::mat4(1.0f)); // + initial matrix
+    trfmStack.push(trfmStack.top()); // ++ copy default matrix
+    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)); // root position
 
     // ---------------------- pyramid == sun --------------------------------------------
-    trfmStack.push(trfmStack.top()); // ++ copy default matrix
-    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)); // sun position
     trfmStack.push(trfmStack.top()); // +++ push another transform because we want child objects to be relative to the translation above
     trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(1.0f, 0.0f, 0.0f)); // sun rotation
     mMat = trfmStack.top();
@@ -643,28 +368,27 @@ void passTwo(GLFWwindow* window, double currentTime)
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(0);
     glFrontFace(GL_CCW); // the pyramid vertices have counter-clockwise winding order
-        // --- pyramid texturing ---
+    // --- pyramid texturing ---
     glBindBuffer(GL_ARRAY_BUFFER, vbo[2]);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(1);
-    glActiveTexture(GL_TEXTURE0);
+    glActiveTexture(GL_TEXTURE0 + 0);
     glBindTexture(GL_TEXTURE_2D, brickTexture);
-        // -------------------------
-        // --- pyramid lighting ---
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[13]);
+    glActiveTexture(GL_TEXTURE0 + 1);
+    glBindTexture(GL_TEXTURE_2D, brickTexture);
+    // -------------------------
+    // --- pyramid normals ---
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[3]);
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(2);
     invTrMat = glm::transpose(glm::inverse(mMat));
-    glUniformMatrix4fv(nLoc, 1, GL_FALSE, glm::value_ptr(invTrMat));
-        // ------------------------
-	    // --- pyramid shadowing ---
-    shadowMVP = b * lightPmatrix * lightVmatrix * mMat;
-	glUniformMatrix4fv(shLoc, 1, GL_FALSE, glm::value_ptr(shadowMVP));
-        // -------------------------
+    nMat = glm::mat3(invTrMat[0], invTrMat[1], invTrMat[2]);
+    glUniformMatrix3fv(nLoc, 1, GL_FALSE, glm::value_ptr(nMat));
+    // ------------------------
     glDrawArrays(GL_TRIANGLES, 0, 18); // draw the sun
     trfmStack.pop(); // ++ sun's axial rotation removed
     // ----------------------------------------------------------------------------------
-
+    
     // ----------------------- cube == planet -------------------------------------------
     trfmStack.push(trfmStack.top()); // +++ inherit sun's translation
     trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(sin((float)currentTime) * 4.0, 0.0f, cos((float)currentTime) * 4.0));
@@ -678,44 +402,27 @@ void passTwo(GLFWwindow* window, double currentTime)
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, cubeStride, 0);
     glEnableVertexAttribArray(0);
     glFrontFace(GL_CW); // the cube vertices have clockwise winding order
-        // --- cube texturing ---
+    // --- cube texture coordinates ---
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, cubeStride, (void*)(6 * sizeof(float)));
     glEnableVertexAttribArray(1);
-    glActiveTexture(GL_TEXTURE0);
+    // --------------------------------
+    // --- cube texture samplers ---
+    glActiveTexture(GL_TEXTURE0 + 0);
     glBindTexture(GL_TEXTURE_2D, brickTexture);
-        // ----------------------
-        // --- cube lighting ---
+    glActiveTexture(GL_TEXTURE0 + 1);
+    glBindTexture(GL_TEXTURE_2D, brickTexture);
+    // -----------------------------
+    // --- cube normals ---
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, cubeStride, (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(2);
+    // --------------------
+    // --- cube model inverse transpose ---
     invTrMat = glm::transpose(glm::inverse(mMat));
-    glUniformMatrix4fv(nLoc, 1, GL_FALSE, glm::value_ptr(invTrMat));
-        // ---------------------
-        // --- cube shadowing ---
-    shadowMVP = b * lightPmatrix * lightVmatrix * mMat;
-    glUniformMatrix4fv(shLoc, 1, GL_FALSE, glm::value_ptr(shadowMVP));
-        // -------------------------
+    nMat = glm::mat3(invTrMat[0], invTrMat[1], invTrMat[2]);
+    glUniformMatrix3fv(nLoc, 1, GL_FALSE, glm::value_ptr(nMat));
+    // ------------------------------------
     glDrawArrays(GL_TRIANGLES, 0, 36); // draw the planet
-    trfmStack.pop(); // +++ planet's rotation axis and scaling removed
-
-    // ----------------------- smaller cube == moon -------------------------------------
-    trfmStack.push(trfmStack.top()); // ++++ inherit planet's translation
-    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, sin((float)currentTime) * 2.0, cos((float)currentTime) * 2.0));
-    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0, 0.0, 1.0)); // moon rotation
-    trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(0.25f, 0.25f, 0.25f)); // make the moon smaller
-    mMat = trfmStack.top();
-    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(mMat));
-
-    // recalculate inverse-transpose of M matrix
-    invTrMat = glm::transpose(glm::inverse(mMat));
-    glUniformMatrix4fv(nLoc, 1, GL_FALSE, glm::value_ptr(invTrMat));
-
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, cubeStride, 0);
-    glEnableVertexAttribArray(0);
-    glBindTexture(GL_TEXTURE_2D, 0); // unbind texture
-    glDrawArrays(GL_TRIANGLES, 0, 36); // draw the moon
-
-    trfmStack.pop(); // +++ remove moon's transformations
+    trfmStack.pop(); // +++ remove planet's rotation axis and scaling
     trfmStack.pop(); // ++ remove planet's translation
     // ----------------------------------------------------------------------------------
 
@@ -727,270 +434,65 @@ void passTwo(GLFWwindow* window, double currentTime)
     mMat = trfmStack.top();
     glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(mMat));
 
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[3]);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[4]);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(0);
     glFrontFace(GL_CCW); // the sphere vertices have clockwise winding order
-	    // --- sphere texturing ---
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[4]);
+    // --- sphere texturing ---
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[5]);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0); // specify layout of tex coords
     glEnableVertexAttribArray(1); // enable vert shader to access tex coords stored in VBO
-    glActiveTexture(GL_TEXTURE0);
+    glActiveTexture(GL_TEXTURE0 + 0);
     glBindTexture(GL_TEXTURE_2D, earthTexture);
-        // ------------------------
-        // --- sphere lighting ---
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[5]);
+    glActiveTexture(GL_TEXTURE0 + 1);
+    glBindTexture(GL_TEXTURE_2D, earthTexture);
+    // ------------------------
+    // --- sphere normals ---
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[6]);
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(2);
     invTrMat = glm::transpose(glm::inverse(mMat));
-    glUniformMatrix4fv(nLoc, 1, GL_FALSE, glm::value_ptr(invTrMat));
-        // -----------------------
-        // --- sphere shadowing ---
-    shadowMVP = b * lightPmatrix * lightVmatrix * mMat;
-    glUniformMatrix4fv(shLoc, 1, GL_FALSE, glm::value_ptr(shadowMVP));
-        // ------------------------
+    nMat = glm::mat3(invTrMat[0], invTrMat[1], invTrMat[2]);
+    glUniformMatrix3fv(nLoc, 1, GL_FALSE, glm::value_ptr(nMat));
+    // -----------------------
     glDrawArrays(GL_TRIANGLES, 0, mySphere.getNumIndices());
 
     trfmStack.pop(); // ++ remove sphere's transformations
     // ----------------------------------------------------------------------------------
 
-    // ------------------------------ procedural torus ----------------------------------
-    trfmStack.push(trfmStack.top()); // +++ inherit sun's translation
-    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(2.0f, 0.0f, 0.0f));
-    trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(2.0f, 2.0f, 2.0f));
-    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), Utils::toRadians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0f, -1.0, 0.0f));
-    mMat = trfmStack.top();
-    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(mMat));
-
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[6]);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(0);
-    glFrontFace(GL_CCW);
-        // --- torus texturing ---
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[7]);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(1);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, brickTexture);
-        // -----------------------
-        // --- torus lighting ---
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[8]);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(2);
-    invTrMat = glm::transpose(glm::inverse(mMat));
-    glUniformMatrix4fv(nLoc, 1, GL_FALSE, glm::value_ptr(invTrMat));
-        // ----------------------
-        // --- torus shadowing ---
-    shadowMVP = b * lightPmatrix * lightVmatrix * mMat;
-    glUniformMatrix4fv(shLoc, 1, GL_FALSE, glm::value_ptr(shadowMVP));
-        // -------------------------
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo[9]);
-    glDrawElements(GL_TRIANGLES, myTorus.getNumIndices(), GL_UNSIGNED_INT, 0);
-
-    trfmStack.pop(); // ++ remove torus's transformations
-    // ----------------------------------------------------------------------------------
-
-    // ------------------------------- imported shuttle -----------------------------------
-    trfmStack.push(trfmStack.top()); // +++ inherit sun's translation
-    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(cos((float)currentTime) * 4.0f, sin((float)currentTime) * 4.0f, cos((float)currentTime) * 4.0f));
-    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(1.0, 1.0, 0.0));
-    trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(4.0f, 4.0f, 4.0f));
-    mMat = trfmStack.top();
-    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(mMat));
-
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[10]);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(0);
-    glFrontFace(GL_CCW);
-        // --- shuttle texturing ---
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[11]);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(1);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, shuttleTexture);
-        // ------------------------
-        // --- shuttle lighting ---
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[12]);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(2);
-    invTrMat = glm::transpose(glm::inverse(mMat));
-    glUniformMatrix4fv(nLoc, 1, GL_FALSE, glm::value_ptr(invTrMat));
-        // ------------------------
-        // --- shuttle shadowing ---
-    shadowMVP = b * lightPmatrix * lightVmatrix * mMat;
-    glUniformMatrix4fv(shLoc, 1, GL_FALSE, glm::value_ptr(shadowMVP));
-        // -------------------------
-    glDrawArrays(GL_TRIANGLES, 0, myShuttle.getNumVertices());
-
-    trfmStack.pop(); // ++ remove shuttle's transformations
-    // ------------------------------------------------------------------------------------
-
-    // ------------------------------- imported dolphin -----------------------------------
-    trfmStack.push(trfmStack.top()); // +++ inherit sun's translation
-    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(cos((float)currentTime) * 4.0f, -sin((float)currentTime) * 4.0f, -cos((float)currentTime) * 4.0f));
-    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), -(float)currentTime, glm::vec3(1.0, 1.0, 0.0));
-    trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(4.0f, 4.0f, 4.0f));
-    mMat = trfmStack.top();
-    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(mMat));
-
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[14]);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(0);
-    glFrontFace(GL_CCW);
-        // --- dolphin texturing ---
-    glBindTexture(GL_TEXTURE_2D, 0);
-        // ------------------------
-        // --- dolphin lighting ---
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[16]);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(2);
-    invTrMat = glm::transpose(glm::inverse(mMat));
-    glUniformMatrix4fv(nLoc, 1, GL_FALSE, glm::value_ptr(invTrMat));
-        // ------------------------
-        // --- dolphin shadowing ---
-    shadowMVP = b * lightPmatrix * lightVmatrix * mMat;
-    glUniformMatrix4fv(shLoc, 1, GL_FALSE, glm::value_ptr(shadowMVP));
-        // -------------------------
-    glDrawArrays(GL_TRIANGLES, 0, myDolphin.getNumVertices());
-
-    trfmStack.pop(); // ++ remove dolphin's transformations
-    // ------------------------------------------------------------------------------------
-
-    trfmStack.pop(); // + remove sun's translation
+    trfmStack.pop(); // + remove root position
     trfmStack.pop(); // remove initial matrix
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void bindPBRTextures(GLuint albedoTex)
+void lightingPass(GLFWwindow* window, double currentTime)
 {
-    /*
-    If we had these textures, we'd load them in init and send to frag shader here
-    but for now we just use the albedo texture for everything.
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, albedoTex);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, normalTex);
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, metallicTex);
-    glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_2D, roughnessTex);
-    glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D, aoTex);
-    */
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, albedoTex);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, albedoTex);
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, albedoTex);
-    glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_2D, albedoTex);
-    glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D, albedoTex);
-}
-
-void unbindPBRTextures()
-{
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D, 0);
-}
-
-void displayStencilOutline(GLFWwindow* window, double currentTime)
-{
-    std::stack<glm::mat4> trfmStackSt;
-    glm::mat4 mMatSt;
-    GLuint mLocSt, vLocSt, pLocSt;
-    float scale = 1.1f;
-
-    glStencilFunc(GL_NOTEQUAL, 1, 0xFF); // s_test passes if ref value is NOTEQUAL to the s_buffer value
-    glStencilMask(0x00); // disable writing to s_buffer
-    glDisable(GL_DEPTH_TEST);
-
-    glUseProgram(stencilProgram);
-
-    // reference uniform variables
-    mLocSt = glGetUniformLocation(stencilProgram, "m_matrix");
-    vLocSt = glGetUniformLocation(stencilProgram, "v_matrix");
-    pLocSt = glGetUniformLocation(stencilProgram, "p_matrix");
-
-    // copy perspective matrix
-    glUniformMatrix4fv(pLocSt, 1, GL_FALSE, glm::value_ptr(pMat));
-
-    // build and copy view matrix
-    glUniformMatrix4fv(vLocSt, 1, GL_FALSE, glm::value_ptr(vMat));
-
-    trfmStackSt.push(glm::mat4(1.0f)); // + initial matrix
-
-    // ---------------------- pyramid == sun (outline) --------------------------------------------
-    trfmStackSt.push(trfmStackSt.top()); // ++ copy default matrix
-    trfmStackSt.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)); //  pyramid position
-    trfmStackSt.push(trfmStackSt.top()); // +++ push another transform because we want child objects to be relative to the translation above
-    trfmStackSt.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(1.0f, 0.0f, 0.0f)); //  pyramid rotation
-    trfmStackSt.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(scale, scale, scale));
-    mMatSt = trfmStackSt.top();
-    glUniformMatrix4fv(mLocSt, 1, GL_FALSE, glm::value_ptr(mMatSt));
-    // -------------------------------
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(0);
-    glFrontFace(GL_CCW); // the pyramid vertices have counter-clockwise winding order
-    // -------------------------------
-    glDrawArrays(GL_TRIANGLES, 0, 18); // draw the pyramid
-    trfmStackSt.pop(); // ++ remove pyramid's rotation and scale
-    // --------------------------------------------------------------------------------------------
-
-    trfmStackSt.pop(); // + remove root translation
-    trfmStackSt.pop(); // remove initial matrix
-
-    glStencilMask(0xFF); // enable writing to s_buffer
-    glStencilFunc(GL_ALWAYS, 0, 0xFF); // s_test ALWAYS passes, ref value = 0
-    glEnable(GL_DEPTH_TEST);
-}
-
-void displayPBR(GLFWwindow* window, double currentTime)
-{
-    glEnable(GL_STENCIL_TEST);
-    // KEEP buffer value if s_test fails
-    // KEEP buffer value if s_test passes but d_test fails
-    // REPLACE buffer value with ref value if s_test and d_test both pass
-    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-    glStencilFunc(GL_ALWAYS, 1, 0xFF); // s_test ALWAYS passes, ref value = 1
-    glStencilMask(0xFF); // enable writing to s_buffer
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glUseProgram(pbrProgram);
 
-    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-    glEnable(GL_CULL_FACE);
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LEQUAL);
+// todo
+    //GLuint gPositionLoc = glGetUniformLocation(pbrProgram, "gPosition");
+    //glUniform1i(gPositionLoc, 0);
+    //GLuint gNormalLoc = glGetUniformLocation(pbrProgram, "gNormal");
+    //glUniform1i(gNormalLoc, 1);
+    //GLuint gAlbedoSpecLoc = glGetUniformLocation(pbrProgram, "gAlbedoSpec");
+    //glUniform1i(gAlbedoSpecLoc, 2);
+//
+
+    glActiveTexture(GL_TEXTURE0 + 0);
+    glBindTexture(GL_TEXTURE_2D, gPosition);
+    glActiveTexture(GL_TEXTURE0 + 1);
+    glBindTexture(GL_TEXTURE_2D, gNormal);
+    glActiveTexture(GL_TEXTURE0 + 2);
+    glBindTexture(GL_TEXTURE_2D, gAlbedoSpec);
 
     // temporarily setting each frame
     glUniform3f(glGetUniformLocation(pbrProgram, "albedoScale"), 1.0f, 1.0f, 1.0f);
     glUniform1f(glGetUniformLocation(pbrProgram, "aoScale"), 1.0f);
     glUniform1f(glGetUniformLocation(pbrProgram, "metallicScale"), 1.0f);
     glUniform1f(glGetUniformLocation(pbrProgram, "roughnessScale"), 1.0f);
-
-    // reference uniform variables
-    mLoc = glGetUniformLocation(pbrProgram, "m_matrix");
-    vLoc = glGetUniformLocation(pbrProgram, "v_matrix");
-    pLoc = glGetUniformLocation(pbrProgram, "p_matrix");
-    nLoc = glGetUniformLocation(pbrProgram, "n_matrix");
-
-    // copy perspective matrix
-    glUniformMatrix4fv(pLoc, 1, GL_FALSE, glm::value_ptr(pMat));
-
-    // build and copy view matrix
-    vMat = glm::translate(glm::mat4(1.0f), glm::vec3(-cameraX, -cameraY, -cameraZ));
-    glUniformMatrix4fv(vLoc, 1, GL_FALSE, glm::value_ptr(vMat));
 
     // provide camera position
     glUniform3fv(
@@ -1011,268 +513,14 @@ void displayPBR(GLFWwindow* window, double currentTime)
             1, &lightColors[i][0]);
     }
 
-    trfmStack.push(glm::mat4(1.0f)); // + initial matrix
+    renderQuad();
 
-    // ---------------------- pyramid == sun --------------------------------------------
-    trfmStack.push(trfmStack.top()); // ++ copy default matrix
-    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)); // sun position
-    trfmStack.push(trfmStack.top()); // +++ push another transform because we want child objects to be relative to the translation above
-    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(1.0f, 0.0f, 0.0f)); // sun rotation
-    mMat = trfmStack.top();
-    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(mMat));
-
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(0);
-    glFrontFace(GL_CCW); // the pyramid vertices have counter-clockwise winding order
-    // --- pyramid texturing ---
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[2]);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(1);
-    bindPBRTextures(brickTexture);
-    // -------------------------
-    // --- pyramid lighting ---
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[13]);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(2);
-    invTrMat = glm::transpose(glm::inverse(mMat));
-    nMat = glm::mat3(invTrMat[0], invTrMat[1], invTrMat[2]);
-    glUniformMatrix3fv(nLoc, 1, GL_FALSE, glm::value_ptr(nMat));
-    // ------------------------
-    // --- pyramid shadowing ---
-    shadowMVP = b * lightPmatrix * lightVmatrix * mMat;
-    glUniformMatrix4fv(shLoc, 1, GL_FALSE, glm::value_ptr(shadowMVP));
-    // -------------------------
-    glDrawArrays(GL_TRIANGLES, 0, 18); // draw the sun
-    trfmStack.pop(); // ++ sun's axial rotation removed
-    // --- pyramid outlining ---
-    displayStencilOutline(window, glfwGetTime());
-    glUseProgram(pbrProgram);
-    // -------------------------
-    // ----------------------------------------------------------------------------------
-
-    // ----------------------- cube == planet -------------------------------------------
-    trfmStack.push(trfmStack.top()); // +++ inherit sun's translation
-    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(sin((float)currentTime) * 4.0, 0.0f, cos((float)currentTime) * 4.0));
-    trfmStack.push(trfmStack.top()); // ++++ push another transform because we want child objects to be relative to the translation above
-    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0, 1.0, 0.0)); // planet rotation
-    trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(0.75f, 0.75f, 0.75f));
-    mMat = trfmStack.top();
-    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(mMat));
-
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, cubeStride, 0);
-    glEnableVertexAttribArray(0);
-    glFrontFace(GL_CW); // the cube vertices have clockwise winding order
-    // --- cube texturing ---
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, cubeStride, (void*)(6 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    bindPBRTextures(brickTexture);
-    // ----------------------
-    // --- cube lighting ---
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, cubeStride, (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-    invTrMat = glm::transpose(glm::inverse(mMat));
-    nMat = glm::mat3(invTrMat[0], invTrMat[1], invTrMat[2]);
-    glUniformMatrix3fv(nLoc, 1, GL_FALSE, glm::value_ptr(nMat));
-    // ---------------------
-    // --- cube shadowing ---
-    shadowMVP = b * lightPmatrix * lightVmatrix * mMat;
-    glUniformMatrix4fv(shLoc, 1, GL_FALSE, glm::value_ptr(shadowMVP));
-    // -------------------------
-    glDrawArrays(GL_TRIANGLES, 0, 36); // draw the planet
-    trfmStack.pop(); // +++ planet's rotation axis and scaling removed
-
-    // ----------------------- smaller cube == moon -------------------------------------
-    trfmStack.push(trfmStack.top()); // ++++ inherit planet's translation
-    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, sin((float)currentTime) * 2.0, cos((float)currentTime) * 2.0));
-    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0, 0.0, 1.0)); // moon rotation
-    trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(0.25f, 0.25f, 0.25f)); // make the moon smaller
-    mMat = trfmStack.top();
-    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(mMat));
-
-    // recalculate inverse-transpose of M matrix
-    invTrMat = glm::transpose(glm::inverse(mMat));
-    nMat = glm::mat3(invTrMat[0], invTrMat[1], invTrMat[2]);
-    glUniformMatrix3fv(nLoc, 1, GL_FALSE, glm::value_ptr(nMat));
-
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, cubeStride, 0);
-    glEnableVertexAttribArray(0);
-    unbindPBRTextures();
-    glDrawArrays(GL_TRIANGLES, 0, 36); // draw the moon
-
-    trfmStack.pop(); // +++ remove moon's transformations
-    trfmStack.pop(); // ++ remove planet's translation
-    // ----------------------------------------------------------------------------------
-
-    // ------------------------------ procedural sphere ---------------------------------
-    trfmStack.push(trfmStack.top()); // +++ inherit sun's translation
-    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(-2.0f, 0.0f, 0.0f));
-    trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, 1.0f, 1.0f));
-    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0f, 1.0f, 0.0f));
-    mMat = trfmStack.top();
-    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(mMat));
-
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[3]);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(0);
-    glFrontFace(GL_CCW); // the sphere vertices have clockwise winding order
-    // --- sphere texturing ---
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[4]);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0); // specify layout of tex coords
-    glEnableVertexAttribArray(1); // enable vert shader to access tex coords stored in VBO
-    bindPBRTextures(earthTexture);
-    // ------------------------
-    // --- sphere lighting ---
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[5]);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(2);
-    invTrMat = glm::transpose(glm::inverse(mMat));
-    nMat = glm::mat3(invTrMat[0], invTrMat[1], invTrMat[2]);
-    glUniformMatrix3fv(nLoc, 1, GL_FALSE, glm::value_ptr(nMat));
-    // -----------------------
-    glDrawArrays(GL_TRIANGLES, 0, mySphere.getNumIndices());
-
-    trfmStack.pop(); // ++ remove sphere's transformations
-    // ------------------------------------------------------------------------------------
-
-    // ------------------------------ procedural torus ----------------------------------
-    trfmStack.push(trfmStack.top()); // +++ inherit sun's translation
-    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(2.0f, 0.0f, 0.0f));
-    trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(2.0f, 2.0f, 2.0f));
-    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), Utils::toRadians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(0.0f, -1.0, 0.0f));
-    mMat = trfmStack.top();
-    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(mMat));
-
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[6]);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(0);
-    glFrontFace(GL_CCW);
-    // --- torus texturing ---
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[7]);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(1);
-    bindPBRTextures(brickTexture);
-    // -----------------------
-    // --- torus lighting ---
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[8]);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(2);
-    invTrMat = glm::transpose(glm::inverse(mMat));
-    nMat = glm::mat3(invTrMat[0], invTrMat[1], invTrMat[2]);
-    glUniformMatrix3fv(nLoc, 1, GL_FALSE, glm::value_ptr(nMat));
-    // ----------------------
-    // --- torus shadowing ---
-    shadowMVP = b * lightPmatrix * lightVmatrix * mMat;
-    glUniformMatrix4fv(shLoc, 1, GL_FALSE, glm::value_ptr(shadowMVP));
-    // -------------------------
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbo[9]);
-    glDrawElements(GL_TRIANGLES, myTorus.getNumIndices(), GL_UNSIGNED_INT, 0);
-
-    trfmStack.pop(); // ++ remove torus's transformations
-    // ----------------------------------------------------------------------------------
-
-    // ------------------------------- imported shuttle -----------------------------------
-    trfmStack.push(trfmStack.top()); // +++ inherit sun's translation
-    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(cos((float)currentTime) * 4.0f, sin((float)currentTime) * 4.0f, cos((float)currentTime) * 4.0f));
-    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), (float)currentTime, glm::vec3(1.0, 1.0, 0.0));
-    trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(4.0f, 4.0f, 4.0f));
-    mMat = trfmStack.top();
-    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(mMat));
-
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[10]);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(0);
-    glFrontFace(GL_CCW);
-    // --- shuttle texturing ---
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[11]);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(1);
-    bindPBRTextures(shuttleTexture);
-    // ------------------------
-    // --- shuttle lighting ---
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[12]);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(2);
-    invTrMat = glm::transpose(glm::inverse(mMat));
-    nMat = glm::mat3(invTrMat[0], invTrMat[1], invTrMat[2]);
-    glUniformMatrix3fv(nLoc, 1, GL_FALSE, glm::value_ptr(nMat));
-    // ------------------------
-    // --- shuttle shadowing ---
-    shadowMVP = b * lightPmatrix * lightVmatrix * mMat;
-    glUniformMatrix4fv(shLoc, 1, GL_FALSE, glm::value_ptr(shadowMVP));
-    // -------------------------
-    glDrawArrays(GL_TRIANGLES, 0, myShuttle.getNumVertices());
-
-    trfmStack.pop(); // ++ remove shuttle's transformations
-    // ------------------------------------------------------------------------------------
-
-    // ------------------------------- imported dolphin -----------------------------------
-    trfmStack.push(trfmStack.top()); // +++ inherit sun's translation
-    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(cos((float)currentTime) * 4.0f, -sin((float)currentTime) * 4.0f, -cos((float)currentTime) * 4.0f));
-    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), -(float)currentTime, glm::vec3(1.0, 1.0, 0.0));
-    trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(4.0f, 4.0f, 4.0f));
-    mMat = trfmStack.top();
-    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(mMat));
-
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[14]);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(0);
-    glFrontFace(GL_CCW);
-    // --- dolphin texturing ---
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[15]);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(1);
-    unbindPBRTextures();
-    // ------------------------
-    // --- dolphin lighting ---
-    glBindBuffer(GL_ARRAY_BUFFER, vbo[16]);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(2);
-    invTrMat = glm::transpose(glm::inverse(mMat));
-    nMat = glm::mat3(invTrMat[0], invTrMat[1], invTrMat[2]);
-    glUniformMatrix3fv(nLoc, 1, GL_FALSE, glm::value_ptr(nMat));
-    // ------------------------
-    // --- dolphin shadowing ---
-    shadowMVP = b * lightPmatrix * lightVmatrix * mMat;
-    glUniformMatrix4fv(shLoc, 1, GL_FALSE, glm::value_ptr(shadowMVP));
-    // -------------------------
-    glDrawArrays(GL_TRIANGLES, 0, myDolphin.getNumVertices());
-
-    trfmStack.pop(); // ++ remove dolphin's transformations
-    // ------------------------------------------------------------------------------------
-
-    trfmStack.pop(); // + remove sun's translation
-    trfmStack.pop(); // remove initial matrix
-}
-
-void display(GLFWwindow* window, double currentTime)
-{
-    glClear(GL_DEPTH_BUFFER_BIT);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    // set up view and perspective matrix from the light point of view, for pass 1
-    lightVmatrix = glm::lookAt(currLightPos, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)); // vector from light to origin
-    lightPmatrix = glm::perspective(1.0472f, aspect, 0.1f, 1000.0f);
-
-    // make the custom frame buffer current, and associate it with the shadow texture
-    glBindFramebuffer(GL_FRAMEBUFFER, shadowBuffer);
-    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadowTex, 0);
-
-    // disable drawing colors
-    glDrawBuffer(GL_NONE);
-
-    passOne(window, currentTime);
-
-    // restore the default display buffer, and re-enable drawing
+    // 2.5. copy content of geometry's depth buffer to default framebuffer's depth buffer
+// ----------------------------------------------------------------------------------
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, gBuffer);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // write to default framebuffer
+    glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, shadowTex);
-    glDrawBuffer(GL_FRONT); // re-enables drawing colors
-
-    passTwo(window, currentTime);
 }
 
 void window_reshape_callback(GLFWwindow* window, int newWidth, int newHeight)
@@ -1284,7 +532,6 @@ void window_reshape_callback(GLFWwindow* window, int newWidth, int newHeight)
     glViewport(0, 0, width, height); // set screen region associated with framebuffer
     pMat = glm::perspective(1.0472f, aspect, 0.1f, 1000.0f); // update perspective matrix, 1.0472 radians = 60 degrees
 
-    glBindTexture(GL_TEXTURE_2D, shadowTex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0); // update shadow size
 }
 
@@ -1319,8 +566,8 @@ int main(void)
 
     while (!glfwWindowShouldClose(window))
     {
-        //display(window, glfwGetTime());
-        displayPBR(window, glfwGetTime());
+        geometryPass(window, glfwGetTime());
+        lightingPass(window, glfwGetTime());
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
