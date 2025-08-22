@@ -47,6 +47,15 @@
     <None Include="Resources\frag1Shader.glsl">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="Resources\fragPBRShader.glsl">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="Resources\fragStencilShader.glsl">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="Resources\vertPBRShader.glsl">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Public\Utils.h">

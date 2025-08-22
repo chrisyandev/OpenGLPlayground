@@ -29,8 +29,11 @@
   <ItemGroup>
     <None Include="Resources\frag1Shader.glsl" />
     <None Include="Resources\frag2Shader.glsl" />
+    <None Include="Resources\fragPBRShader.glsl" />
+    <None Include="Resources\fragStencilShader.glsl" />
     <None Include="Resources\vert1Shader.glsl" />
     <None Include="Resources\vert2Shader.glsl" />
+    <None Include="Resources\vertPBRShader.glsl" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Public\ImportedModel.h" />
