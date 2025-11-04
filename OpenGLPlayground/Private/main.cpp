@@ -16,7 +16,7 @@
 constexpr GLuint SCR_WIDTH = 800;
 constexpr GLuint SCR_HEIGHT = 600;
 constexpr GLuint NUM_VAOS = 1;
-constexpr GLuint NUM_VBOS = 17;
+constexpr GLuint NUM_VBOS = 20;
 constexpr GLsizei cubeStride = 8 * sizeof(float);
 
 std::string resourcePath;
@@ -28,6 +28,7 @@ Sphere mySphere(48);
 Torus myTorus(0.5f, 0.2f, 48);
 ImportedModel myShuttle("shuttle.obj");
 ImportedModel myDolphin("dolphinHighPoly.obj");
+ImportedModel myDuck("duck.obj");
 
 // allocate variables used in display() function, so that they won’t need to be allocated during rendering
 int width, height;
@@ -39,6 +40,7 @@ std::stack<glm::mat4> trfmStack;
 GLuint brickTexture;
 GLuint earthTexture;
 GLuint shuttleTexture;
+GLuint duckTexture;
 
 // shader uniform locations
 GLuint mLoc, vLoc, pLoc, nLoc, shLoc;
@@ -323,15 +325,47 @@ void setupVertices()
         dolNormVals.push_back(dolNorms[i].z);
     }
 
-    // put the vertices into buffer #11
+    // put the vertices into buffer #15
     glBindBuffer(GL_ARRAY_BUFFER, vbo[14]);
     glBufferData(GL_ARRAY_BUFFER, dolPosVals.size() * 4, &dolPosVals[0], GL_STATIC_DRAW);
-    // put the texture coordinates into buffer #12
+    // put the texture coordinates into buffer #16
     glBindBuffer(GL_ARRAY_BUFFER, vbo[15]);
     glBufferData(GL_ARRAY_BUFFER, dolTexVals.size() * 4, &dolTexVals[0], GL_STATIC_DRAW);
-    // put the normals into buffer #13
+    // put the normals into buffer #17
     glBindBuffer(GL_ARRAY_BUFFER, vbo[16]);
     glBufferData(GL_ARRAY_BUFFER, dolNormVals.size() * 4, &dolNormVals[0], GL_STATIC_DRAW);
+    // ----------------------------------------------------------------------------------------
+
+    // ------------------------------- imported duck -----------------------------------
+    std::vector<glm::vec3> duckVerts = myDuck.getVertices();
+    std::vector<glm::vec2> duckTexs = myDuck.getTextureCoords();
+    std::vector<glm::vec3> duckNorms = myDuck.getNormals();
+    std::vector<float> duckPosVals; // vertex positions
+    std::vector<float> duckTexVals; // texture coordinates
+    std::vector<float> duckNormVals; // normal vectors
+
+    int duckNumVertices = myDuck.getNumVertices();
+    for (int i = 0; i < duckNumVertices; i++)
+    {
+        duckPosVals.push_back(duckVerts[i].x);
+        duckPosVals.push_back(duckVerts[i].y);
+        duckPosVals.push_back(duckVerts[i].z);
+        duckTexVals.push_back(duckTexs[i].s);
+        duckTexVals.push_back(duckTexs[i].t);
+        duckNormVals.push_back(duckNorms[i].x);
+        duckNormVals.push_back(duckNorms[i].y);
+        duckNormVals.push_back(duckNorms[i].z);
+    }
+
+    // put the vertices into buffer #18
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[17]);
+    glBufferData(GL_ARRAY_BUFFER, duckPosVals.size() * 4, &duckPosVals[0], GL_STATIC_DRAW);
+    // put the texture coordinates into buffer #19
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[18]);
+    glBufferData(GL_ARRAY_BUFFER, duckTexVals.size() * 4, &duckTexVals[0], GL_STATIC_DRAW);
+    // put the normals into buffer #20
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[19]);
+    glBufferData(GL_ARRAY_BUFFER, duckNormVals.size() * 4, &duckNormVals[0], GL_STATIC_DRAW);
     // ----------------------------------------------------------------------------------------
 }
 
@@ -381,6 +415,7 @@ void init(GLFWwindow* window)
     brickTexture = Utils::loadTexture(resourcePath, "brick1.jpg");
     earthTexture = Utils::loadTexture(resourcePath, "earthmap1k.jpg");
     shuttleTexture = Utils::loadTexture(resourcePath, "spstob_1.jpg");
+    duckTexture = Utils::loadTexture(resourcePath, "duck.jpg");
 }
 
 void installLights(GLuint renderingProgram)
@@ -565,6 +600,26 @@ void passOne(GLFWwindow* window, double currentTime)
     glDrawArrays(GL_TRIANGLES, 0, myDolphin.getNumVertices());
 
     trfmStack.pop(); // ++ remove dolphin's transformations
+    // ------------------------------------------------------------------------------------
+
+    // ------------------------------- imported duck -----------------------------------
+    trfmStack.push(trfmStack.top()); // +++ inherit sun's translation
+    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(cos((float)currentTime) * 4.0f, sin((float)currentTime) * 4.0f, -cos((float)currentTime) * 4.0f));
+    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), -(float)currentTime, glm::vec3(1.0, 1.0, 0.0));
+    trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(10.0f, 10.0f, 10.0f));
+    mMat = trfmStack.top();
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[17]);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(0);
+    glFrontFace(GL_CCW);
+    // --- duck shadowing ----
+    shadowMVP = lightPmatrix * lightVmatrix * mMat;
+    glUniformMatrix4fv(shLoc, 1, GL_FALSE, glm::value_ptr(shadowMVP));
+    // --------------------------
+    glDrawArrays(GL_TRIANGLES, 0, myDuck.getNumVertices());
+
+    trfmStack.pop(); // ++ remove duck's transformations
     // ------------------------------------------------------------------------------------
 
     trfmStack.pop(); // + remove sun's translation
@@ -829,6 +884,41 @@ void passTwo(GLFWwindow* window, double currentTime)
     glDrawArrays(GL_TRIANGLES, 0, myDolphin.getNumVertices());
 
     trfmStack.pop(); // ++ remove dolphin's transformations
+    // ------------------------------------------------------------------------------------
+
+    // ------------------------------- imported duck -----------------------------------
+    trfmStack.push(trfmStack.top()); // +++ inherit sun's translation
+    trfmStack.top() *= glm::translate(glm::mat4(1.0f), glm::vec3(cos((float)currentTime) * 4.0f, sin((float)currentTime) * 4.0f, -cos((float)currentTime) * 4.0f));
+    trfmStack.top() *= glm::rotate(glm::mat4(1.0f), -(float)currentTime, glm::vec3(1.0, 1.0, 0.0));
+    trfmStack.top() *= glm::scale(glm::mat4(1.0f), glm::vec3(10.0f, 10.0f, 10.0f));
+    mMat = trfmStack.top();
+    glUniformMatrix4fv(mLoc, 1, GL_FALSE, glm::value_ptr(mMat));
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[17]);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(0);
+    glFrontFace(GL_CCW);
+    // --- duck texturing ---
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[18]);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(1);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, duckTexture);
+    // ------------------------
+    // --- duck lighting ---
+    glBindBuffer(GL_ARRAY_BUFFER, vbo[19]);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(2);
+    invTrMat = glm::transpose(glm::inverse(mMat));
+    glUniformMatrix4fv(nLoc, 1, GL_FALSE, glm::value_ptr(invTrMat));
+    // ------------------------
+    // --- duck shadowing ---
+    shadowMVP = b * lightPmatrix * lightVmatrix * mMat;
+    glUniformMatrix4fv(shLoc, 1, GL_FALSE, glm::value_ptr(shadowMVP));
+    // -------------------------
+    glDrawArrays(GL_TRIANGLES, 0, myDolphin.getNumVertices());
+
+    trfmStack.pop(); // ++ remove duck's transformations
     // ------------------------------------------------------------------------------------
 
     trfmStack.pop(); // + remove sun's translation
